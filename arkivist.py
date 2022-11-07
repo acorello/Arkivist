@@ -6,7 +6,7 @@ import PyPDF2 as pdf
 import isbnlib
 from isbnlib.registry import PROVIDERS as METADATA_PROVIDERS
 from isbnlib import ISBNLibException
-import pipe
+from pipe import traverse, map as fn
 import magic
 import mimetypes
 
@@ -24,6 +24,44 @@ class MetadataRetrievalFailed(ArkivistException):
 class UnsupportedFormat(ArkivistException):
     def __init__(self, format_str: str):
         self.message = f"Format: {format_str}"
+
+
+def _isbn_of_pdf(file: Path):
+    pdfr = pdf.PdfReader(file)
+    isbns = (
+        pdfr.pages[:5]
+        | fn(pdf.PageObject.extract_text)
+        | fn(isbnlib.get_isbnlike)
+        | traverse
+        | fn(isbnlib.canonical)
+    )
+    return next(isbns, None)
+
+
+def _book_metadata(isbn: str) -> dict[str, str]:
+    data = None
+    for provider in METADATA_PROVIDERS:
+        try:
+            if data := isbnlib.meta(isbn, service=provider):
+                return data
+        except ISBNLibException:
+            continue
+    raise MetadataRetrievalFailed(f"ISBN: {isbn}")
+
+
+def _file_extension(filepath: PurePath) -> str | None:
+    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+        mimetype = m.id_filename(filepath.as_posix())
+        if ext := mimetypes.guess_extension(mimetype):
+            return ext[1:]  # strip leading dot
+
+
+def _isbn(file: PurePath, file_format: str):
+    match file_format:
+        case "pdf":
+            return _isbn_of_pdf(file)
+        case _:
+            raise UnsupportedFormat(file_format)
 
 
 @dataclass(
@@ -55,48 +93,7 @@ def path_by_publisher(b: BookInfo) -> PurePath:
 
 def books(folder: Path) -> Iterable[Path]:
     "Traverse folder looking book files"
-    pdfs = folder.rglob("*.pdf")
-    epubs = folder.rglob("*.epub")
-    return itt.chain(pdfs, epubs)
-
-
-def _isbn_of_pdf(file: Path):
-    pdfr = pdf.PdfReader(file)
-    map = pipe.map
-    isbns = (
-        pdfr.pages[:5]
-        | map(pdf.PageObject.extract_text)
-        | map(isbnlib.get_isbnlike)
-        | pipe.traverse
-        | map(isbnlib.canonical)
-    )
-    return next(isbns, None)
-
-
-def _book_metadata(isbn: str) -> dict[str, str]:
-    data = None
-    for provider in METADATA_PROVIDERS:
-        try:
-            if data := isbnlib.meta(isbn, service=provider):
-                return data
-        except ISBNLibException:
-            continue
-    raise MetadataRetrievalFailed(f"ISBN: {isbn}")
-
-
-def _file_extension(filepath: PurePath) -> str | None:
-    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
-        mimetype = m.id_filename(filepath.as_posix())
-        if ext := mimetypes.guess_extension(mimetype):
-            return ext[1:]  # strip leading dot
-
-
-def _isbn(file: PurePath, file_format: str):
-    match file_format:
-        case "pdf":
-            return _isbn_of_pdf(file)
-        case _:
-            raise UnsupportedFormat(file_format)
+    return ["*.pdf", "*.epub"] | fn(folder.rglob) | traverse
 
 
 def book_info(file: Path) -> BookInfo | None:
