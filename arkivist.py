@@ -4,8 +4,26 @@ from dataclasses import dataclass
 from typing import *
 import PyPDF2 as pdf
 import isbnlib
-from isbnlib import RE_ISBN13
+from isbnlib.registry import PROVIDERS as METADATA_PROVIDERS
+from isbnlib import ISBNLibException
 import pipe
+import magic
+import mimetypes
+
+
+class ArkivistException(Exception):
+    def __str__(self):
+        return getattr(self, "message", "")  # pragma: no cover
+
+
+class MetadataRetrievalFailed(ArkivistException):
+    def __init__(self, message):
+        self.message = message
+
+
+class UnsupportedFormat(ArkivistException):
+    def __init__(self, format_str: str):
+        self.message = f"Format: {format_str}"
 
 
 @dataclass(
@@ -16,14 +34,14 @@ class BookInfo:
     title: str
     year: int
     publisher: str
-    ext: str
+    extension: str
 
 
 def path_by_isbn(b: BookInfo) -> PurePath:
     return PurePath(
         "By-ISBN",
         f"{b.isbn} • {b.title} • {b.year} • {b.publisher}",
-        f"{b.title}.{b.ext}",
+        f"{b.title}.{b.extension}",
     )
 
 
@@ -31,7 +49,7 @@ def path_by_publisher(b: BookInfo) -> PurePath:
     return PurePath(
         "By-Publisher",
         f"{b.isbn} • {b.title} • {b.year}",
-        f"{b.title}.{b.ext}",
+        f"{b.title}.{b.extension}",
     )
 
 
@@ -48,18 +66,51 @@ def _isbn_of_pdf(file: Path):
     isbns = (
         pdfr.pages[:5]
         | map(pdf.PageObject.extract_text)
-        | map(RE_ISBN13.finditer)
+        | map(isbnlib.get_isbnlike)
         | pipe.traverse
-        | map(Match.group)
         | map(isbnlib.canonical)
     )
     return next(isbns, None)
 
 
+def _book_metadata(isbn: str) -> dict[str, str]:
+    data = None
+    for provider in METADATA_PROVIDERS:
+        try:
+            if data := isbnlib.meta(isbn, service=provider):
+                return data
+        except ISBNLibException:
+            continue
+    raise MetadataRetrievalFailed(f"ISBN: {isbn}")
+
+
+def _file_extension(filepath: PurePath) -> str | None:
+    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
+        mimetype = m.id_filename(filepath.as_posix())
+        if ext := mimetypes.guess_extension(mimetype):
+            return ext[1:]  # strip leading dot
+
+
+def _isbn(file: PurePath, file_format: str):
+    match file_format:
+        case "pdf":
+            return _isbn_of_pdf(file)
+        case _:
+            raise UnsupportedFormat(file_format)
+
+
 def book_info(file: Path) -> BookInfo | None:
     "Extract ISBN from file; resolve Title, Year, Author, Publisher"
-    if isbn := _isbn_of_pdf(file):
-        return BookInfo(isbn=isbn, title=None, publisher=None, year=0, ext=None)
+    ext = _file_extension(file)
+    if isbn := _isbn(file, ext):
+        m = _book_metadata(isbn)
+        return BookInfo(
+            isbn=m["ISBN-13"],
+            title=m["Title"].title(),
+            publisher=m["Publisher"].title(),
+            year=int(m["Year"]),
+            extension=ext,
+        )
 
 
 # Candidate Book: a PDF, an ePub, …

@@ -3,6 +3,7 @@ import pathlib as pl
 import datetime as dt
 import shutil as sh
 import pytest as pyt
+from pytest import fixture
 
 """markdown
 # Goal 1
@@ -22,7 +23,7 @@ I want to organize them in the following paths:
 """
 
 
-@pyt.fixture
+@fixture
 def books_folder(pytestconfig: pyt.Config) -> pl.Path:
     sample_books = pytestconfig.rootpath.joinpath("sample_books")
     samples_copy = pl.Path().joinpath(
@@ -33,23 +34,39 @@ def books_folder(pytestconfig: pyt.Config) -> pl.Path:
     sh.rmtree(samples_copy)
 
 
-def books_test(books_folder: pl.Path):
-    assert books_folder.exists()
-    assert sum(1 for _ in arkv.books(books_folder)) == 4
-
-
-def resolve_metadata_test(pytestconfig: pyt.Config):
-    sample_book = pytestconfig.rootpath.joinpath(
+@fixture
+def book_of_unkown_isbn(pytestconfig: pyt.Config):
+    # TODO: add test covering this case
+    return pytestconfig.rootpath.joinpath(
         "sample_books",
         "By-ISBN",
         "978-1-098-10483-2 ÷ Knowledge Graphs - Data in Context for Responsive Businesses ÷ O'Reilly",
         "book.pdf",
     )
-    assert arkv._isbn_of_pdf(sample_book) == "9781098104832"
-    # arkv.BookInfo(
-    #     isbn="9781098104832",
-    #     title="Knowledge Graphs - Data in Context for Responsive Businesses",
-    #     year=2020,
-    #     publisher="O'Reilly",
-    #     ext="pdf",
-    # )
+
+
+@fixture
+def book_of_known_isbn(pytestconfig: pyt.Config):
+    # TODO: add test covering this case
+    return pytestconfig.rootpath.joinpath(
+        "sample_books",
+        "By-Publisher",
+        "O'Reilly",
+        "Erlang Programming",
+        "Erlang Programming - Francesco Cesarini.pdf",
+    )
+
+
+def books_test(books_folder: pl.Path):
+    assert books_folder.exists()
+    assert sum(1 for _ in arkv.books(books_folder)) == 4
+
+
+def resolve_metadata_test(book_of_known_isbn: pl.Path):
+    assert arkv.book_info(book_of_known_isbn) == arkv.BookInfo(
+        isbn="9780596518189",
+        title="Erlang Programming",
+        year=2009,
+        publisher="O'Reilly",
+        extension="pdf",
+    )
