@@ -1,5 +1,5 @@
 import arkivist as arkv
-import pathlib as pl
+from pathlib import Path, PurePath
 import datetime as dt
 import shutil as sh
 import pytest as pyt
@@ -22,11 +22,13 @@ I want to organize them in the following paths:
 2. Fetch book’s attributes from online sources (is isbntools sufficient?)
 """
 
+NO_ISBN_FOLDER = PurePath("No-ISBN")
+
 
 @fixture
-def books_folder(pytestconfig: pyt.Config) -> pl.Path:
+def books_folder(pytestconfig: pyt.Config) -> Path:
     sample_books = pytestconfig.rootpath.joinpath("sample_books")
-    samples_copy = pl.Path().joinpath(
+    samples_copy = Path().joinpath(
         "tmp", f"sample_books_{dt.datetime.now().isoformat()}"
     )
     sh.copytree(sample_books, samples_copy)
@@ -34,9 +36,13 @@ def books_folder(pytestconfig: pyt.Config) -> pl.Path:
     sh.rmtree(samples_copy)
 
 
+def sanity_check_test(books_folder: Path):
+    assert books_folder.exists()
+    assert sum(1 for _ in arkv.books(books_folder)) == 4
+
+
 @fixture
-def book_of_unkown_isbn(pytestconfig: pyt.Config):
-    # TODO: add test covering this case
+def book_without_metadata(pytestconfig: pyt.Config):
     return pytestconfig.rootpath.joinpath(
         "sample_books",
         "By-ISBN",
@@ -45,9 +51,13 @@ def book_of_unkown_isbn(pytestconfig: pyt.Config):
     )
 
 
+@pyt.mark.skip(reason="TODO")
+def book_without_metadata_test(book_without_metadata: PurePath):
+    ...
+
+
 @fixture
-def book_of_known_isbn(pytestconfig: pyt.Config):
-    # TODO: add test covering this case
+def book_with_metadata(pytestconfig: pyt.Config):
     return pytestconfig.rootpath.joinpath(
         "sample_books",
         "By-Publisher",
@@ -57,13 +67,24 @@ def book_of_known_isbn(pytestconfig: pyt.Config):
     )
 
 
-def books_test(books_folder: pl.Path):
-    assert books_folder.exists()
-    assert sum(1 for _ in arkv.books(books_folder)) == 4
+@fixture
+def book_without_isbn():
+    ...
 
 
-def resolve_metadata_test(book_of_known_isbn: pl.Path):
-    assert arkv.book_info(book_of_known_isbn) == arkv.BookInfo(
+@pyt.mark.skip(reason="TODO")
+def books_without_isbn_test(book_without_isbn: PurePath):
+    f"Books without ISBN are placed under {NO_ISBN_FOLDER}"
+    ...
+
+
+@pyt.mark.skip(reason="TODO")
+def other_files_beside_books_test():
+    ...
+
+
+def resolve_metadata_test(book_with_metadata: Path):
+    assert arkv.book_info(book_with_metadata) == arkv.BookInfo(
         isbn="9780596518189",
         title="Erlang Programming",
         year=2009,

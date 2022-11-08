@@ -10,6 +10,17 @@ from pipe import traverse, map as fn
 import magic
 import mimetypes
 
+# What can go wrong?
+# The path constructed based on the file metadata may be the same as the file itself
+# so I could get an exception trying to write the file onto itself; if I go parallel
+# or concurrent, I could have different files trying to write on each other.
+# Depending on the sequential or concurrent execution model, I could adopt different
+# strategies to prevent overriding the file.
+
+# For the moment I'm going to implement the algorithm to:
+# - move recognized files in the desired location
+# - move unrecognized files in a special location
+
 
 class ArkivistException(Exception):
     def __str__(self):
