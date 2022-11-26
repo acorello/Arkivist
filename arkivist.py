@@ -1,136 +1,128 @@
-import itertools as itt
-from pathlib import *
 from dataclasses import dataclass
-from typing import *
-import PyPDF2 as pdf
+from pathlib import Path, PurePath
+from typing import Iterable
+
 import isbnlib
-from isbnlib.registry import PROVIDERS as METADATA_PROVIDERS
-from isbnlib import ISBNLibException
-from pipe import traverse, map as fn
-import magic
-import mimetypes
+import isbnlib.registry
 
-# What can go wrong?
-# The path constructed based on the file metadata may be the same as the file itself
-# so I could get an exception trying to write the file onto itself; if I go parallel
-# or concurrent, I could have different files trying to write on each other.
-# Depending on the sequential or concurrent execution model, I could adopt different
-# strategies to prevent overriding the file.
+from . import fileformat
+from . import metadata_source
 
-# For the moment I'm going to implement the algorithm to:
-# - move recognized files in the desired location
-# - move unrecognized files in a special location
+# I like the java naming convention: fully qualified names make it obvious to see which imports are from third parties.
 
 
-class ArkivistException(Exception):
-    def __str__(self):
-        return getattr(self, "message", "")  # pragma: no cover
+@dataclass
+class NoISBN:
+    pass
 
 
-class MetadataRetrievalFailed(ArkivistException):
-    def __init__(self, message):
-        self.message = message
-
-
-class UnsupportedFormat(ArkivistException):
-    def __init__(self, format_str: str):
-        self.message = f"Format: {format_str}"
-
-
-def _isbn_of_pdf(file: Path):
-    pdfr = pdf.PdfReader(file)
-    isbns = (
-        pdfr.pages[:5]
-        | fn(pdf.PageObject.extract_text)
-        | fn(isbnlib.get_isbnlike)
-        | traverse
-        | fn(isbnlib.canonical)
-    )
-    return next(isbns, None)
-
-
-def _book_metadata(isbn: str) -> dict[str, str]:
-    data = None
-    for provider in METADATA_PROVIDERS:
-        try:
-            if data := isbnlib.meta(isbn, service=provider):
-                return data
-        except ISBNLibException:
-            continue
-    raise MetadataRetrievalFailed(f"ISBN: {isbn}")
-
-
-def _file_extension(filepath: PurePath) -> str | None:
-    with magic.Magic(flags=magic.MAGIC_MIME_TYPE) as m:
-        mimetype = m.id_filename(filepath.as_posix())
-        if ext := mimetypes.guess_extension(mimetype):
-            return ext[1:]  # strip leading dot
-
-
-def _isbn(file: PurePath, file_format: str):
-    match file_format:
-        case "pdf":
-            return _isbn_of_pdf(file)
-        case _:
-            raise UnsupportedFormat(file_format)
-
-
-@dataclass(
-    frozen=True,
-)
+@dataclass(frozen=True)
 class BookInfo:
     isbn: str
     title: str
     year: int
     publisher: str
-    extension: str
 
 
-def path_by_isbn(b: BookInfo) -> PurePath:
-    return PurePath(
-        "By-ISBN",
-        f"{b.isbn} • {b.title} • {b.year} • {b.publisher}",
-        f"{b.title}.{b.extension}",
-    )
+@dataclass(frozen=True)
+class BookFileInfo(BookInfo):
+    mime_type: str
 
-
-def path_by_publisher(b: BookInfo) -> PurePath:
-    return PurePath(
-        "By-Publisher",
-        f"{b.isbn} • {b.title} • {b.year}",
-        f"{b.title}.{b.extension}",
-    )
-
-
-def books(folder: Path) -> Iterable[Path]:
-    "Traverse folder looking book files"
-    return ["*.pdf", "*.epub"] | fn(folder.rglob) | traverse
-
-
-def book_info(file: Path) -> BookInfo | None:
-    "Extract ISBN from file; resolve Title, Year, Author, Publisher"
-    ext = _file_extension(file)
-    if isbn := _isbn(file, ext):
-        m = _book_metadata(isbn)
-        return BookInfo(
-            isbn=m["ISBN-13"],
-            title=m["Title"].title(),
-            publisher=m["Publisher"].title(),
-            year=int(m["Year"]),
-            extension=ext,
+    def path_by_isbn(self) -> PurePath:
+        return PurePath(
+            "By-ISBN",
+            f"{self.isbn} • {self.title} • {self.year} • {self.publisher}",
+            f"{self.title}.{self.extension()}",
         )
 
+    def extension(self):
+        match self.mime_type:
+            case fileformat.Epub.MIME_TYPE:
+                "epub"
+            case fileformat.Pdf.MIME_TYPE:
+                "pdf"
 
-# Candidate Book: a PDF, an ePub, …
-BASE_FOLDER = Path(Path.home(), "Documents", "Books, Magazines, Articles")
+
+class ISBN:
+    def __init__(self, isbn_like: str):
+        self.ean13 = isbnlib.ean13(isbn_like)
+
+    def __str__(self):
+        return self.ean13
+
+    def canonical(self):
+        return isbnlib.canonical(self.ean13)
 
 
-def organize(base_path: Path) -> None:
-    for book_file in books(base_path):
+# TODO: can I make this a sort of "interface"? (rather than throwing an exception, I force the implementation to implement the declared methods.)
+class Book:
+    def find_isbn() -> ISBN:
+        raise NotImplementedError("should be implemented by file-specific subclasses")
+
+
+def current_book_paths(folder: Path) -> Iterable[Path]:
+    """Paths to each book in folder (*.{pdf,epub} files).
+
+    In case of multiple links to the same file only the first is returned."""
+    for exts in ["*.pdf", "*.epub"]:
+        for path in folder.rglob(exts):
+            if path.is_file():
+                yield path
+
+
+def book_info(file: Path):
+    "Extract ISBN from file; resolve Title, Year, Author, Publisher"
+    book = fileformat.load_book(file)
+    if isbn := book.find_isbn():
+        return metadata_source.get_book_info(isbn)
+    else:
+        return NoISBN()
+
+
+def paths_from_bookinfo(book_info: BookInfo):
+    # TODO: generate other paths, eg By-Publisher, By-Topic, etc.
+    return [
+        book_info.path_by_isbn(),
+    ]
+
+
+# file -> book_info   -> ProperPaths
+#         no_isbn     -> NoISBNPath
+#         no_metadata -> NoMetadataPath
+
+
+def proper_book_paths(base_path: PurePath, book_path: PurePath) -> list[PurePath]:
+    "Given a file Returns relative paths under which the book should be filed"
+
+    def path_under(sub_folder: str):
+        return sub_folder.joinpath(book_path.relative_to(base_path))
+
+    match book_info(book_path):
+        case BookInfo() as b:
+            return paths_from_bookinfo(b)
+        case NoISBN():
+            return [path_under("No-ISBN")]
+        case metadata_source.NoMetadata():
+            return [path_under("No-Metadata")]
+
+
+BASE_FOLDER = Path(Path.home(), "Documents", "Books and Articles")
+TARGET_FOLDER = BASE_FOLDER.with_suffix(".ARKIVIST")
+
+
+def organize_books(base_path: Path) -> None:
+    assert base_path.exists() and base_path.is_dir() and base_path.is_absolute()
+    for book_path in current_book_paths(base_path):
+        # I'm running this on a folder having multiple paths pointing to the same file.
+        # If books naively returns all paths that resolve to the same file, the same file will be
+        #   processed multiple times; which is inefficient.
+        # Symlinks or Hardlinks?
+        # - hardlinks for files within the same file-system
+        # - symlinks for files across file systems or for directories
         try:
-            bookinfo = book_info(book_file)
-            new_path = base_path.joinpath(path_by_isbn(bookinfo))
-            print(f"Moving {book_file} to {new_path}")
+            return book_path, list(
+                map(lambda p: TARGET_FOLDER.joinpath(p), (base_path, book_path))
+            )
         except Exception as e:
-            print("Error processing", book_file, e)
+            print("Error processing", book_path, e)
             continue

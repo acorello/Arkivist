@@ -6,23 +6,46 @@ import pytest as pyt
 from pytest import fixture
 
 """markdown
-# Goal 1
+# Interim Goal 1 (interim because selecting by extension is not ideal: the type should be implied by the file contents not by the file name)
 
-Given a folder with electronics books stored as `*.pdf` or `*.epub` files in various places
+Given a folder with electronics books stored as `*.pdf` or `*.epub` files in various sub-folders,
 
-I want to organize them in the following paths:
+I want to file them in different categories, each category represented by a path.
 
+I want to use the following categories:
 - `$BASE/By-ISBN/{ISBN} • {Title} • {Year} • {Publisher}/{Title}.{ext}`
+- `$BASE/No-ISBN/{Title} • {Authors} • {Year} • {Publisher}/{Title}.{ext}`
 - `$BASE/By-Publisher/{Title} • {Year}/{Title}.{ext}`
+- …a number of other categories 
 
-## Challenge
+Files in the same folder are different formats of that book.
 
-1. Reliably extract book’s ISBN: the proxy for all other attributes.
-    - Strategy 1: parse ePub or PDF in folder and search for the ISBN.
-2. Fetch book’s attributes from online sources (is isbntools sufficient?)
+If a book is saved only with one format, it will still be placed within a folder.
+
+I wish I could create hard-links to link to a book from different categories, but Apple's readers don't work well with it.
+So I'm falling back to symlinks to the book folder (or should I use symlinks to the book files?).
+
+Folders are categories, sub-folders are sub-categories. Absolute paths are categorization.
+A book is linked under different paths.
+Possible LinkingStrategies:
+- hard-links to files
+- symlinks to files
+- symlinks to folder
+- OS-specific alias to file
+- OS-specific alias to folder
+
+
+Testing Strategy:
+- create a sample-folder with:
+  - {pdf,epub} book {with,without} ISBN in the {correct,incorrect} place
+  # I'm reluctant to hardcode the enumerated set, it's a duplication; but how can I map each testcase with the expected result if I don't do that?
+  # should I consider books for which I only have incomplete metadata?
+    // target-place: By-ISBN|No-ISBN, By-Publisher, By-Author.
 """
 
-NO_ISBN_FOLDER = PurePath("No-ISBN")
+# TODO: conflicting knowledge:
+#       - each book format (PDF, ePub, paper) has a different ISBN
+#       - multiple formats are stored within the same folder under By-ISBN category
 
 
 @fixture
@@ -38,11 +61,11 @@ def books_folder(pytestconfig: pyt.Config) -> Path:
 
 def sanity_check_test(books_folder: Path):
     assert books_folder.exists()
-    assert sum(1 for _ in arkv.books(books_folder)) == 4
+    assert sum(1 for _ in arkv.current_book_paths(books_folder)) == 4  # is this useful?
 
 
 @fixture
-def book_without_metadata(pytestconfig: pyt.Config):
+def pdf_without_metadata(pytestconfig: pyt.Config):
     return pytestconfig.rootpath.joinpath(
         "sample_books",
         "By-ISBN",
@@ -52,12 +75,12 @@ def book_without_metadata(pytestconfig: pyt.Config):
 
 
 @pyt.mark.skip(reason="TODO")
-def book_without_metadata_test(book_without_metadata: PurePath):
+def pdf_without_metadata_test(pdf_without_metadata: PurePath):
     ...
 
 
 @fixture
-def book_with_metadata(pytestconfig: pyt.Config):
+def pdf_with_metadata(pytestconfig: pyt.Config):
     return pytestconfig.rootpath.joinpath(
         "sample_books",
         "By-Publisher",
@@ -74,7 +97,7 @@ def book_without_isbn():
 
 @pyt.mark.skip(reason="TODO")
 def books_without_isbn_test(book_without_isbn: PurePath):
-    f"Books without ISBN are placed under {NO_ISBN_FOLDER}"
+    f"Books without ISBN are placed under {arkv.NO_ISBN_SUBFOLDER}"
     ...
 
 
@@ -83,11 +106,22 @@ def other_files_beside_books_test():
     ...
 
 
-def resolve_metadata_test(book_with_metadata: Path):
-    assert arkv.book_info(book_with_metadata) == arkv.BookInfo(
+def resolve_metadata_test(pdf_with_metadata: Path):
+    assert arkv.book_info(pdf_with_metadata) == arkv.BookInfo(
         isbn="9780596518189",
         title="Erlang Programming",
         year=2009,
         publisher="O'Reilly",
-        extension="pdf",
     )
+
+
+def generate_paths(pdf_with_metadata: Path):
+    arkv.proper_book_paths()
+
+
+"""
+; pseudo-clojure using pattern matching to extract value of attribute 'full-path' from XML contained in zip archive. I can traverse `zip-file` with FilePath pattern because it implements FileSystem protocol.
+(match zip-file
+    #FilePath(META-INF container.xml
+        #XMLPath(container rootfiles rootfile #XMLAttr(full-path :as full_path :as-type Set<String>))))
+"""
