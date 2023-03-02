@@ -11,82 +11,170 @@ import (
 	"strings"
 )
 
-var renameFlag = flag.Bool("rename", false, "execute renaming")
-var basePathFlag = flag.String("path", basePathOrPanic(), "folder containing files to clean-up")
+var (
+	destinationDirectoryFlag = flag.String("destination", "", "directory containing files to clean-up")
+	justPrintConfigFlag      = flag.Bool("justconfig", false, "print only the final job configuration")
+	onlyFailedFlag           = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
+	quietFlag                = flag.Bool("quiet", false, "do not print to stdout")
+	renameFlag               = flag.Bool("rename", false, "execute renaming")
+	sourceDirectoryFlag      = flag.String("source", defaultSourceOrPanic(), "directory containing files to clean-up")
+)
 
 type Config struct {
-	rename     bool
-	baseFolder string
+	destinationDirectory string
+	onlyPrintFailed      bool
+	quiet                bool
+	rename               bool
+	sourceDirectory      string
+}
+
+func (I Config) Errors() (errors []error) {
+	if I.rename && I.onlyPrintFailed {
+		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
+	}
+	errors = append(errors, missingDirectoriesErrors(I.sourceDirectory, I.destinationDirectory)...)
+	return
 }
 
 func main() {
-	config := initConfig()
+	config := populateConfig()
+
+	exitCode, stop := shouldStop(config)
+	if stop {
+		os.Exit(exitCode)
+	}
+
 	cleanup(config)
 }
 
-func initConfig() Config {
+func shouldStop(config Config) (exitCode int, stop bool) {
+	if *justPrintConfigFlag {
+		fmt.Printf("%#v\n", config)
+		stop = true
+	}
+	errors := config.Errors()
+	for _, err := range errors {
+		fmt.Println(err)
+	}
+	if len(errors) > 0 {
+		exitCode = 1
+		stop = true
+	}
+	return
+}
+
+func missingDirectoriesErrors(directories ...string) (errors []error) {
+	for _, dir := range directories {
+		if !directoryExists(dir) {
+			errors = append(errors, fmt.Errorf("%s: does not exists", dir))
+		}
+	}
+	return
+}
+
+func directoryExists(path string) bool {
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false
+		} else {
+			log.Panicf("Error checking directory: %s\n", err)
+		}
+	}
+	return true
+}
+
+func populateConfig() Config {
 	flag.Parse()
 	config := Config{
-		rename:     *renameFlag,
-		baseFolder: *basePathFlag,
+		destinationDirectory: *destinationDirectoryFlag,
+		onlyPrintFailed:      *onlyFailedFlag,
+		quiet:                *quietFlag,
+		rename:               *renameFlag,
+		sourceDirectory:      *sourceDirectoryFlag,
+	}
+	if len(config.destinationDirectory) == 0 {
+		config.destinationDirectory = config.sourceDirectory
 	}
 	return config
 }
 
-func basePathOrPanic() string {
+func defaultSourceOrPanic() string {
 	return filepath.Join(homeDirOrPanic(), "Downloads")
 }
 
 func homeDirOrPanic() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalln("Failed to get user's home folder to set default base path")
+		log.Fatalln("Failed to get user's home directory")
 	}
 	return home
 }
 
 func cleanup(config Config) {
-	folder := config.baseFolder
-	for _, dirtyFile := range dirtyFiles(folder) {
+	sourceDirectory := config.sourceDirectory
+	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
 		dirtyName := dirtyFile.Name()
-		fname := cleanFilename(dirtyName)
-		if dirtyName == fname {
-			fmt.Println("WARNING: filename cleaning failed")
-			fmt.Println("\t- ", dirtyName)
-			fmt.Println("\t+ ", fname)
+		cleanName := cleanFilename(dirtyName)
+		if hasFailures(dirtyName, cleanName) {
 			continue
 		}
-		if hasUnorthodoxRune(fname) {
-			fmt.Println("WARNING: filename cleaning left unorthodox runes in the name")
-			fmt.Println("\t- ", dirtyName)
-			fmt.Println("\t+ ", fname)
+		if config.onlyPrintFailed {
 			continue
 		}
-		oldPath := filepath.Join(folder, dirtyName)
-		newPath := filepath.Join(folder, fname)
+		oldPath := filepath.Join(sourceDirectory, dirtyName)
+		newPath := filepath.Join(config.destinationDirectory, cleanName)
 		if config.rename {
 			os.Rename(oldPath, newPath)
 		}
-		fmt.Println("MOVED:")
-		fmt.Println("\t-", oldPath)
-		fmt.Println("\t+", newPath)
+		if !config.quiet {
+			fmt.Println("MOVED:")
+			fmt.Println("\t-", oldPath)
+			fmt.Println("\t+", newPath)
+		}
 	}
 }
 
+func hasFailures(dirtyName string, fname string) bool {
+	printErr := func(s ...string) {
+		fmt.Fprintln(os.Stderr, s)
+	}
+	if dirtyName == fname {
+		printErr("WARNING: filename cleaning failed")
+		printErr("\t- ", dirtyName)
+		printErr("\t+ ", fname)
+		return true
+	}
+	if hasUnorthodoxRune(fname) {
+		printErr("WARNING: filename cleaning left unorthodox runes in the name")
+		printErr("\t- ", dirtyName)
+		printErr("\t+ ", fname)
+		return true
+	}
+	return false
+}
+
 func hasUnorthodoxRune(fname string) bool {
-	invalid := regexp.MustCompile(`[^ •[:graph:]]`)
+	invalid := regexp.MustCompile(`[^ •’[:graph:]]`)
 	return invalid.MatchString(fname)
 }
 
 func cleanFilename(filename string) string {
 	// for reference: `(?i)\s*\(\s*(?:https?...)?z-lib\.org\s*\)\s*`
+	const space = " "
 	replacer := strings.NewReplacer(
-		"\u00a0", " ",
+		"\u00a0", space,
+		"\xa0", space,
+		"\t", space,
 		" (z-lib.org)", "",
 		" (Z-Library)", "",
 		"..", "",
 	)
-	return replacer.Replace(filename)
+
+	filename = replacer.Replace(filename)
+	multipleSpaces := regexp.MustCompile(`\s{2,}`)
+	filename = multipleSpaces.ReplaceAllLiteralString(filename, space)
+	return filename
 }
 
 func dirtyFiles(dir string) (dirtyOnes []fs.DirEntry) {
