@@ -172,8 +172,11 @@ func cleanFilename(filename string) string {
 	)
 
 	filename = replacer.Replace(filename)
-	multipleSpaces := regexp.MustCompile(`\s{2,}`)
-	filename = multipleSpaces.ReplaceAllLiteralString(filename, space)
+	rexps := []string{`(\s)\s+`, `(\.)\.+`}
+	for _, rexp := range rexps {
+		multipleSeparators := regexp.MustCompile(rexp)
+		filename = multipleSeparators.ReplaceAllString(filename, `$1`)
+	}
 	return filename
 }
 
