@@ -15,7 +15,8 @@ var (
 	destinationDirectoryFlag = flag.String("destination", "", "directory containing files to clean-up")
 	justPrintConfigFlag      = flag.Bool("justconfig", false, "print only the final job configuration")
 	onlyFailedFlag           = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
-	quietFlag                = flag.Bool("quiet", false, "do not print to stdout")
+	quietFlag                = flag.Bool("quiet", false, "do not print progress to stdout")
+	summaryFlag              = flag.Bool("summary", false, "print list of final filenames at the end")
 	renameFlag               = flag.Bool("rename", false, "execute renaming")
 	sourceDirectoryFlag      = flag.String("source", defaultSourceOrPanic(), "directory containing files to clean-up")
 )
@@ -26,6 +27,7 @@ type Config struct {
 	quiet                bool
 	rename               bool
 	sourceDirectory      string
+	summary              bool
 }
 
 func (I Config) Errors() (errors []error) {
@@ -92,6 +94,7 @@ func populateConfig() Config {
 		quiet:                *quietFlag,
 		rename:               *renameFlag,
 		sourceDirectory:      *sourceDirectoryFlag,
+		summary:              *summaryFlag,
 	}
 	if len(config.destinationDirectory) == 0 {
 		config.destinationDirectory = config.sourceDirectory
@@ -113,6 +116,7 @@ func homeDirOrPanic() string {
 
 func cleanup(config Config) {
 	sourceDirectory := config.sourceDirectory
+	var summary strings.Builder
 	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
 		dirtyName := dirtyFile.Name()
 		cleanName := cleanFilename(dirtyName)
@@ -132,6 +136,16 @@ func cleanup(config Config) {
 			fmt.Println("\t-", oldPath)
 			fmt.Println("\t+", newPath)
 		}
+		if config.summary {
+			summary.WriteString(filepath.Base(newPath))
+			summary.WriteRune('\n')
+		}
+	}
+	if config.summary {
+		if summary.Len() == 0 {
+			summary.WriteString("No files moved\n")
+		}
+		fmt.Print(summary.String())
 	}
 }
 
