@@ -1,63 +1,11 @@
-from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Iterable
 
-import isbnlib
-import isbnlib.registry
-
-from . import fileformat
-from . import metadata_source
+import fileformat
+import metadata_source
+from domain import *
 
 # I like the java naming convention: fully qualified names make it obvious to see which imports are from third parties.
-
-
-@dataclass
-class NoISBN:
-    pass
-
-
-@dataclass(frozen=True)
-class BookInfo:
-    isbn: str
-    title: str
-    year: int
-    publisher: str
-
-
-@dataclass(frozen=True)
-class BookFileInfo(BookInfo):
-    mime_type: str
-
-    def path_by_isbn(self) -> PurePath:
-        return PurePath(
-            "By-ISBN",
-            f"{self.isbn} • {self.title} • {self.year} • {self.publisher}",
-            f"{self.title}.{self.extension()}",
-        )
-
-    def extension(self):
-        match self.mime_type:
-            case fileformat.Epub.MIME_TYPE:
-                "epub"
-            case fileformat.Pdf.MIME_TYPE:
-                "pdf"
-
-
-class ISBN:
-    def __init__(self, isbn_like: str):
-        self.ean13 = isbnlib.ean13(isbn_like)
-
-    def __str__(self):
-        return self.ean13
-
-    def canonical(self):
-        return isbnlib.canonical(self.ean13)
-
-
-# TODO: can I make this a sort of "interface"? (rather than throwing an exception, I force the implementation to implement the declared methods.)
-class Book:
-    def find_isbn() -> ISBN:
-        raise NotImplementedError("should be implemented by file-specific subclasses")
 
 
 def current_book_paths(folder: Path) -> Iterable[Path]:
@@ -120,9 +68,7 @@ def organize_books(base_path: Path) -> None:
         # - hardlinks for files within the same file-system
         # - symlinks for files across file systems or for directories
         try:
-            return book_path, list(
-                map(lambda p: TARGET_FOLDER.joinpath(p), (base_path, book_path))
-            )
+            return book_path, list(map(TARGET_FOLDER.joinpath, (base_path, book_path)))
         except Exception as e:
             print("Error processing", book_path, e)
             continue

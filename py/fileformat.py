@@ -1,5 +1,3 @@
-from . import arkivist
-
 from pathlib import PurePath
 from zipfile import ZipFile
 
@@ -8,6 +6,7 @@ import isbnlib.registry
 import magic
 import PyPDF2 as pdf
 from bs4 import BeautifulSoup
+from domain import ISBN, Book
 
 
 # Wrapper to extract info from book-files
@@ -18,7 +17,7 @@ class UnsupportedFormatException:
         self.message = mime_type
 
 
-class Epub(arkivist.Book):
+class Epub(Book):
     MIME_TYPE = "application/epub+zip"
 
     def __init__(self, filepath: PurePath | str):
@@ -93,7 +92,7 @@ class Epub(arkivist.Book):
             return None
 
 
-class Pdf(arkivist.Book):
+class Pdf(Book):
     MIME_TYPE = "application/pdf"
 
     def __init__(self, path: PurePath):
@@ -104,7 +103,7 @@ class Pdf(arkivist.Book):
         pages = self.pdf_reader.pages[:5]
         text = "".join([pdf.PageObject.extract_text(p) for p in pages])
         isbn: str = next(isbnlib.get_isbnlike(text))
-        return arkivist.ISBN(isbn) if isbn else None
+        return ISBN.of(isbn) if isbn else None
 
 
 def mime_type(filepath: PurePath) -> str | None:
@@ -112,7 +111,7 @@ def mime_type(filepath: PurePath) -> str | None:
         return m.id_filename(filepath.as_posix())
 
 
-def load_book(file: PurePath) -> arkivist.Book | None:
+def load_book(file: PurePath) -> Book | None:
     match mime_type(file):
         case Pdf.MIME_TYPE:
             return Pdf(file)

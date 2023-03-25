@@ -4,7 +4,7 @@ import isbnlib
 import isbnlib.registry
 from isbnlib import ISBNLibException
 
-from .arkivist import ISBN, BookInfo
+from domain import ISBN, BookInfo
 
 # Query datasources for book metadata
 
