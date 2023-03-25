@@ -11,30 +11,62 @@ import (
 	"strings"
 )
 
+/* TODO: improve the error message if we call the command without source and destination.
+
+> zl_cleanup -summary
+invalid directory: blank
+invalid directory: blank
+
+*/
+
+type destinations []string
+
+func (me *destinations) String() string {
+	if me == nil {
+		return ""
+	}
+	return strings.Join(*me, string(os.PathListSeparator))
+}
+
+func (me *destinations) Set(destination string) error {
+	destination = strings.TrimSpace(destination)
+	if len(destination) > 0 {
+		*me = append(*me, destination)
+	}
+	return nil
+}
+
 var (
-	destinationDirectoryFlag = flag.String("destination", "", "directory containing files to clean-up")
-	justPrintConfigFlag      = flag.Bool("justconfig", false, "print only the final job configuration")
-	onlyFailedFlag           = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
-	quietFlag                = flag.Bool("quiet", false, "do not print progress to stdout")
-	summaryFlag              = flag.Bool("summary", false, "print list of final filenames at the end")
-	renameFlag               = flag.Bool("rename", false, "execute renaming")
-	sourceDirectoryFlag      = flag.String("source", defaultSourceOrPanic(), "directory containing files to clean-up")
+	destinationsDirectoryFlag *destinations = new(destinations)
+
+	justPrintConfigFlag = flag.Bool("justconfig", false, "print only the final job configuration")
+	onlyFailedFlag      = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
+	quietFlag           = flag.Bool("quiet", false, "do not print progress to stdout")
+	renameFlag          = flag.Bool("rename", false, "execute renaming")
+	sourceDirectoryFlag = flag.String("source", "", "directory containing files to clean-up")
+	summaryFlag         = flag.Bool("summary", false, "print list of final filenames at the end")
 )
 
+func init() {
+	const destinationHelpMsg = "directory where you want to place the ranamed file; can be repeated"
+	flag.Var(destinationsDirectoryFlag, "destination", destinationHelpMsg)
+}
+
 type Config struct {
-	destinationDirectory string
-	onlyPrintFailed      bool
-	quiet                bool
-	rename               bool
-	sourceDirectory      string
-	summary              bool
+	destinationDirectories []string
+	onlyPrintFailed        bool
+	quiet                  bool
+	rename                 bool
+	sourceDirectory        string
+	summary                bool
 }
 
 func (I Config) Errors() (errors []error) {
 	if I.rename && I.onlyPrintFailed {
 		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
 	}
-	errors = append(errors, missingDirectoriesErrors(I.sourceDirectory, I.destinationDirectory)...)
+	errors = append(errors, missingDirectoriesErrors(I.destinationDirectories...)...)
+	errors = append(errors, missingDirectoriesErrors(I.sourceDirectory)...)
 	return
 }
 
@@ -66,9 +98,19 @@ func shouldStop(config Config) (exitCode int, stop bool) {
 }
 
 func missingDirectoriesErrors(directories ...string) (errors []error) {
+	invalidErr := func(dir string) (err error) {
+		switch {
+		case len(strings.TrimSpace(dir)) == 0:
+			return fmt.Errorf("invalid directory: blank")
+		case !directoryExists(dir):
+			return fmt.Errorf("directory does not exists: %q", dir)
+		default:
+			return nil
+		}
+	}
 	for _, dir := range directories {
-		if !directoryExists(dir) {
-			errors = append(errors, fmt.Errorf("%s: does not exists", dir))
+		if err := invalidErr(dir); err != nil {
+			errors = append(errors, err)
 		}
 	}
 	return
@@ -89,29 +131,17 @@ func directoryExists(path string) bool {
 func populateConfig() Config {
 	flag.Parse()
 	config := Config{
-		destinationDirectory: *destinationDirectoryFlag,
-		onlyPrintFailed:      *onlyFailedFlag,
-		quiet:                *quietFlag,
-		rename:               *renameFlag,
-		sourceDirectory:      *sourceDirectoryFlag,
-		summary:              *summaryFlag,
+		destinationDirectories: *destinationsDirectoryFlag,
+		onlyPrintFailed:        *onlyFailedFlag,
+		quiet:                  *quietFlag,
+		rename:                 *renameFlag,
+		sourceDirectory:        *sourceDirectoryFlag,
+		summary:                *summaryFlag,
 	}
-	if len(config.destinationDirectory) == 0 {
-		config.destinationDirectory = config.sourceDirectory
+	if len(config.destinationDirectories) == 0 {
+		config.destinationDirectories = []string{config.sourceDirectory}
 	}
 	return config
-}
-
-func defaultSourceOrPanic() string {
-	return filepath.Join(homeDirOrPanic(), "Downloads")
-}
-
-func homeDirOrPanic() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalln("Failed to get user's home directory")
-	}
-	return home
 }
 
 func cleanup(config Config) {
@@ -127,18 +157,20 @@ func cleanup(config Config) {
 			continue
 		}
 		oldPath := filepath.Join(sourceDirectory, dirtyName)
-		newPath := filepath.Join(config.destinationDirectory, cleanName)
-		if config.rename {
-			os.Rename(oldPath, newPath)
-		}
-		if !config.quiet {
-			fmt.Println("MOVED:")
-			fmt.Println("\t-", oldPath)
-			fmt.Println("\t+", newPath)
-		}
-		if config.summary {
-			summary.WriteString(filepath.Base(newPath))
-			summary.WriteRune('\n')
+		for _, destination := range config.destinationDirectories {
+			newPath := filepath.Join(destination, cleanName)
+			if config.rename {
+				os.Rename(oldPath, newPath)
+			}
+			if !config.quiet {
+				fmt.Println("MOVED:")
+				fmt.Println("\t-", oldPath)
+				fmt.Println("\t+", newPath)
+			}
+			if config.summary {
+				summary.WriteString(filepath.Base(newPath))
+				summary.WriteRune('\n')
+			}
 		}
 	}
 	if config.summary {
