@@ -42,7 +42,7 @@ var (
 	justPrintConfigFlag = flag.Bool("justconfig", false, "print only the final job configuration")
 	onlyFailedFlag      = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
 	quietFlag           = flag.Bool("quiet", false, "do not print progress to stdout")
-	renameFlag          = flag.Bool("rename", false, "execute renaming")
+	doRunFlag           = flag.Bool("run", false, "execute the operation")
 	sourceDirectoryFlag = flag.String("source", "", "directory containing files to clean-up")
 	summaryFlag         = flag.Bool("summary", false, "print list of final filenames at the end")
 )
@@ -56,13 +56,17 @@ type Config struct {
 	destinationDirectories []string
 	onlyPrintFailed        bool
 	quiet                  bool
-	rename                 bool
+	doRun                  bool
 	sourceDirectory        string
 	summary                bool
 }
 
+func (I Config) dryRun() bool {
+	return !I.doRun
+}
+
 func (I Config) Errors() (errors []error) {
-	if I.rename && I.onlyPrintFailed {
+	if I.doRun && I.onlyPrintFailed {
 		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
 	}
 	errors = append(errors, missingDirectoriesErrors(I.destinationDirectories...)...)
@@ -78,7 +82,7 @@ func main() {
 		os.Exit(exitCode)
 	}
 
-	cleanup(config)
+	linkToCleanPath(config)
 }
 
 func shouldStop(config Config) (exitCode int, stop bool) {
@@ -134,7 +138,7 @@ func populateConfig() Config {
 		destinationDirectories: *destinationsDirectoryFlag,
 		onlyPrintFailed:        *onlyFailedFlag,
 		quiet:                  *quietFlag,
-		rename:                 *renameFlag,
+		doRun:                  *doRunFlag,
 		sourceDirectory:        *sourceDirectoryFlag,
 		summary:                *summaryFlag,
 	}
@@ -144,41 +148,46 @@ func populateConfig() Config {
 	return config
 }
 
-func cleanup(config Config) {
+func linkToCleanPath(config Config) {
 	sourceDirectory := config.sourceDirectory
 	var summary strings.Builder
-	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
-		dirtyName := dirtyFile.Name()
-		cleanName := cleanFilename(dirtyName)
-		if hasFailures(dirtyName, cleanName) {
-			continue
+	fmtSummary := func(format string, a ...any) {
+		if config.quiet {
+			return
 		}
-		if config.onlyPrintFailed {
-			continue
-		}
-		oldPath := filepath.Join(sourceDirectory, dirtyName)
-		for _, destination := range config.destinationDirectories {
-			newPath := filepath.Join(destination, cleanName)
-			if config.rename {
-				os.Rename(oldPath, newPath)
-			}
-			if !config.quiet {
-				fmt.Println("MOVED:")
-				fmt.Println("\t-", oldPath)
-				fmt.Println("\t+", newPath)
-			}
-			if config.summary {
-				summary.WriteString(filepath.Base(newPath))
-				summary.WriteRune('\n')
-			}
-		}
+		summary.WriteString(fmt.Sprintf(format, a...))
 	}
-	if config.summary {
-		if summary.Len() == 0 {
-			summary.WriteString("No files moved\n")
+	printSummary := func() {
+		if !config.quiet && summary.Len() == 0 {
+			fmtSummary("Nothing to report\n")
 		}
 		fmt.Print(summary.String())
 	}
+	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
+		dirtyName := dirtyFile.Name()
+		cleanName := cleanFilename(dirtyName)
+		if hasFailures(dirtyName, cleanName) || config.onlyPrintFailed {
+			continue
+		}
+		oldPath := filepath.Join(sourceDirectory, dirtyName)
+		if !config.quiet {
+			fmtSummary("SOURCE: %q\n", oldPath)
+		}
+		for _, destination := range config.destinationDirectories {
+			newPath := filepath.Join(destination, cleanName)
+			if config.dryRun() {
+				fmtSummary("LINK??: %q\n", newPath)
+				continue
+			}
+			err := os.Link(oldPath, newPath)
+			if err != nil {
+				fmtSummary("ERROR:  %q: %v\n", newPath, err)
+			} else {
+				fmtSummary("LINKED: %q\n", newPath)
+			}
+		}
+	}
+	printSummary()
 }
 
 func hasFailures(dirtyName string, fname string) bool {

@@ -7,7 +7,7 @@ import (
 
 func TestRun(t *testing.T) {
 	config := populateConfig()
-	cleanup(config)
+	linkToCleanPath(config)
 }
 
 func TestHasUnorthodoxRune(t *testing.T) {
