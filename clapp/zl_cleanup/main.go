@@ -159,6 +159,14 @@ func linkToCleanPath(config Config) {
 		}
 		summary.WriteString(fmt.Sprintf(format, a...))
 	}
+	fmtEntry := func(header, newPath string) {
+		fileName := filepath.Base(newPath)
+		fileName = color.CyanString("%s", fileName)
+		dirPath := filepath.Dir(newPath)
+		dirPath = color.BlackString("%s", dirPath)
+		header = color.GreenString(header + ":")
+		fmtSummary("%s %s\n\t%s\n", header, dirPath, fileName)
+	}
 	printSummary := func() {
 		if !config.quiet && summary.Len() == 0 {
 			fmtSummary("Nothing to report\n")
@@ -173,23 +181,20 @@ func linkToCleanPath(config Config) {
 		}
 		oldPath := filepath.Join(sourceDirectory, dirtyName)
 		if !config.quiet {
-			oldPath := color.BlueString(oldPath)
-			fmtSummary("SOURCE: %q\n", oldPath)
+			fmtEntry("SOURCE", oldPath)
 		}
 		for _, destination := range config.destinationDirectories {
 			newPath := filepath.Join(destination, cleanName)
 			if config.dryRun() {
-				newPath := color.CyanString(newPath)
-				fmtSummary("LINK??: %q\n", newPath)
+				fmtEntry("LINK??", newPath)
 				continue
 			}
 			err := os.Link(oldPath, newPath)
 			if err != nil {
-				newPath := color.RedString(newPath)
-				fmtSummary("ERROR:  %q: %v\n", newPath, err)
+				newPath := color.RedString("%q", newPath)
+				fmtSummary("ERROR:  %s: %v\n", newPath, err)
 			} else {
-				newPath := color.GreenString(newPath)
-				fmtSummary("LINKED: %q\n", newPath)
+				fmtEntry("LINKED", newPath)
 			}
 		}
 	}
@@ -197,9 +202,9 @@ func linkToCleanPath(config Config) {
 }
 
 func hasFailures(dirtyName string, fname string) bool {
-	printErr := color.New(color.FgRed).
-		SetWriter(os.Stderr).
-		PrintfFunc()
+	printErr := func(s ...string) {
+		fmt.Fprintln(os.Stderr, s)
+	}
 
 	if dirtyName == fname {
 		printErr("WARNING: filename cleaning failed")
@@ -242,6 +247,12 @@ func cleanFilename(filename string) string {
 		" (z-lib.org)", "",
 		" (Z-Library)", "",
 		"..", "",
+		"—", "-",
+		"⸺", "-",
+		"⸻", "-",
+		"﹘", "-",
+		"–", "-",
+		"‒", "-",
 	)
 
 	filename = replacer.Replace(filename)

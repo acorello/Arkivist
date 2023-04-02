@@ -21,26 +21,21 @@ func TestHasUnorthodoxRune(t *testing.T) {
 			filename: "Grønbaek",
 		},
 		{
-			filename: "9781101152140 • Drive • by Daniel H. Pink • Riverhead Books (z-lib.org)",
+			filename: "9781101152140 • Drive",
 			invalidSubstrings: []invalidSubstring{
 				{position: 17, value: "\u00a0"},
-				{position: 31, value: "\u00a0"},
-				{position: 51, value: "\u00a0"},
 			},
 		},
 		{
 			filename: "9781101152140 • Drive • by Daniel H. Pink • Riverhead Books (z-lib.org)",
 		},
 		{
-			filename: "9781003311973 • Mastering Visual Studio Code A Beginner’s Guide • by Sufyan Bin Uzayr • CRC Press (z-lib.org)",
+			filename: "Handbook of Graph Grammars — (Z-Library).pdf",
 			invalidSubstrings: []invalidSubstring{
-				{position: 17, value: "\u00a0"},
-				{position: 75, value: "\u00a0"},
-				{position: 97, value: "\u00a0"},
-			},
+				{position: 27, value: "—"}},
 		},
 		{
-			filename: "Mastering Visual Studio Code A Beginner’s Guide • by Sufyan Bin Uzayr • CRC Press (z-lib.org).pdf",
+			filename: "Mastering Visual Studio Code A Beginner’s Guide.pdf",
 		},
 	}
 	for n, tc := range cases {
