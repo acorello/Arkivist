@@ -151,7 +151,8 @@ func populateConfig() Config {
 }
 
 type summary struct {
-	strings.Builder
+	out strings.Builder
+	err strings.Builder
 	Config
 }
 
@@ -159,7 +160,14 @@ func (I *summary) fmtSummary(format string, a ...any) {
 	if I.quiet {
 		return
 	}
-	I.WriteString(fmt.Sprintf(format, a...))
+	I.out.WriteString(fmt.Sprintf(format, a...))
+}
+
+func (I *summary) fmtErr(format string, a ...any) {
+	if I.quiet {
+		return
+	}
+	I.err.WriteString(fmt.Sprintf(format, a...))
 }
 
 func (I *summary) fmtEntry(header, dirPath, fileName string) {
@@ -194,20 +202,32 @@ func (I *summary) fmtError(filePath string, err error) {
 	dirPath := filepath.Dir(filePath)
 	dirPath = color.RedString("%s", dirPath)
 	errMessage := color.HiRedString(err.Error())
-	header := color.GreenString("ERROR:")
-	I.fmtSummary("%s %s\n\t%s\n\t%s\n", header, dirPath, fileName, errMessage)
+	header := color.RedString("ERROR:")
+	I.fmtErr("%s %s\n\t%s\n\t%s\n", header, dirPath, fileName, errMessage)
+}
+
+func (I *summary) Len() int {
+	return I.out.Len() + I.err.Len()
 }
 
 func (I *summary) print() {
 	if !I.quiet && I.Len() == 0 {
 		I.fmtSummary("Nothing to report\n")
 	}
-	fmt.Print(I.String())
+	fmt.Fprint(os.Stdout, I.out.String())
+	fmt.Fprint(os.Stderr, I.err.String())
+}
+
+func newSummary(config Config) summary {
+	return summary{
+		Config: config,
+	}
+
 }
 
 func linkToCleanPath(config Config) {
+	s := newSummary(config)
 	sourceDirectory := config.sourceDirectory
-	s := summary{strings.Builder{}, config}
 	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
 		dirtyName := dirtyFile.Name()
 		cleanName := cleanFilename(dirtyName)
