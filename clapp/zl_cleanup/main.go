@@ -200,7 +200,7 @@ func hasFailures(dirtyName string, fname string) bool {
 		printErr("\t+ ", fname)
 		return true
 	}
-	if hasUnorthodoxRune(fname) {
+	if invalidSubstrings(fname) != nil {
 		printErr("WARNING: filename cleaning left unorthodox runes in the name")
 		printErr("\t- ", dirtyName)
 		printErr("\t+ ", fname)
@@ -209,9 +209,20 @@ func hasFailures(dirtyName string, fname string) bool {
 	return false
 }
 
-func hasUnorthodoxRune(fname string) bool {
-	invalid := regexp.MustCompile(`[^ •’[:graph:]]`)
-	return invalid.MatchString(fname)
+type invalidSubstring struct {
+	position int
+	value    string
+}
+
+func invalidSubstrings(fname string) (res []invalidSubstring) {
+	valid := regexp.MustCompile(`[^ •’\p{Latin}\p{Nd}[:punct:]]`)
+	for _, stringIndices := range valid.FindAllStringIndex(fname, -1) {
+		from := stringIndices[0]
+		ntil := stringIndices[1]
+		substring := fname[from:ntil]
+		res = append(res, invalidSubstring{from, substring})
+	}
+	return
 }
 
 func cleanFilename(filename string) string {
