@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/fatih/color"
 )
 
 /* TODO: improve the error message if we call the command without source and destination.
@@ -171,18 +173,22 @@ func linkToCleanPath(config Config) {
 		}
 		oldPath := filepath.Join(sourceDirectory, dirtyName)
 		if !config.quiet {
+			oldPath := color.BlueString(oldPath)
 			fmtSummary("SOURCE: %q\n", oldPath)
 		}
 		for _, destination := range config.destinationDirectories {
 			newPath := filepath.Join(destination, cleanName)
 			if config.dryRun() {
+				newPath := color.CyanString(newPath)
 				fmtSummary("LINK??: %q\n", newPath)
 				continue
 			}
 			err := os.Link(oldPath, newPath)
 			if err != nil {
+				newPath := color.RedString(newPath)
 				fmtSummary("ERROR:  %q: %v\n", newPath, err)
 			} else {
+				newPath := color.GreenString(newPath)
 				fmtSummary("LINKED: %q\n", newPath)
 			}
 		}
@@ -191,9 +197,10 @@ func linkToCleanPath(config Config) {
 }
 
 func hasFailures(dirtyName string, fname string) bool {
-	printErr := func(s ...string) {
-		fmt.Fprintln(os.Stderr, s)
-	}
+	printErr := color.New(color.FgRed).
+		SetWriter(os.Stderr).
+		PrintfFunc()
+
 	if dirtyName == fname {
 		printErr("WARNING: filename cleaning failed")
 		printErr("\t- ", dirtyName)
