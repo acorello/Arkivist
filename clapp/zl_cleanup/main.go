@@ -293,12 +293,12 @@ func cleanFilename(filename string) string {
 		" (z-lib.org)", "",
 		" (Z-Library)", "",
 		"..", "",
-		// "—", "-",
-		// "⸺", "-",
-		// "⸻", "-",
-		// "﹘", "-",
-		// "–", "-",
-		// "‒", "-",
+		"—", "-",
+		"⸺", "-",
+		"⸻", "-",
+		"﹘", "-",
+		"–", "-",
+		"‒", "-",
 	)
 
 	filename = replacer.Replace(filename)
