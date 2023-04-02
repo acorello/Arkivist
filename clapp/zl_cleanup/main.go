@@ -150,72 +150,98 @@ func populateConfig() Config {
 	return config
 }
 
+type summary struct {
+	strings.Builder
+	Config
+}
+
+func (I *summary) fmtSummary(format string, a ...any) {
+	if I.quiet {
+		return
+	}
+	I.WriteString(fmt.Sprintf(format, a...))
+}
+
+func (I *summary) fmtEntry(header, dirPath, fileName string) {
+	header = color.GreenString(header + ":")
+	I.fmtSummary("%s %s\n\t%s\n", header, dirPath, fileName)
+}
+func (I *summary) fmtSource(filePath string) {
+	fileName := filepath.Base(filePath)
+	fileName = color.CyanString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.BlackString("%s", dirPath)
+	I.fmtEntry("SOURCE", dirPath, fileName)
+}
+func (I *summary) fmtLinkPreview(filePath string) {
+	fileName := filepath.Base(filePath)
+	fileName = color.CyanString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.BlackString("%s", dirPath)
+	I.fmtEntry("LINK??", dirPath, fileName)
+}
+func (I *summary) fmtLink(filePath string) {
+	fileName := filepath.Base(filePath)
+	fileName = color.CyanString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.BlackString("%s", dirPath)
+	I.fmtEntry("LINKED", dirPath, fileName)
+}
+
+func (I *summary) fmtError(filePath string, err error) {
+	fileName := filepath.Base(filePath)
+	fileName = color.RedString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.RedString("%s", dirPath)
+	errMessage := color.HiRedString(err.Error())
+	header := color.GreenString("ERROR:")
+	I.fmtSummary("%s %s\n\t%s\n\t%s\n", header, dirPath, fileName, errMessage)
+}
+
+func (I *summary) print() {
+	if !I.quiet && I.Len() == 0 {
+		I.fmtSummary("Nothing to report\n")
+	}
+	fmt.Print(I.String())
+}
+
 func linkToCleanPath(config Config) {
 	sourceDirectory := config.sourceDirectory
-	var summary strings.Builder
-	fmtSummary := func(format string, a ...any) {
-		if config.quiet {
-			return
-		}
-		summary.WriteString(fmt.Sprintf(format, a...))
-	}
-	fmtEntry := func(header, newPath string) {
-		fileName := filepath.Base(newPath)
-		fileName = color.CyanString("%s", fileName)
-		dirPath := filepath.Dir(newPath)
-		dirPath = color.BlackString("%s", dirPath)
-		header = color.GreenString(header + ":")
-		fmtSummary("%s %s\n\t%s\n", header, dirPath, fileName)
-	}
-	printSummary := func() {
-		if !config.quiet && summary.Len() == 0 {
-			fmtSummary("Nothing to report\n")
-		}
-		fmt.Print(summary.String())
-	}
+	s := summary{strings.Builder{}, config}
 	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
 		dirtyName := dirtyFile.Name()
 		cleanName := cleanFilename(dirtyName)
-		if hasFailures(dirtyName, cleanName) || config.onlyPrintFailed {
+		if hasFailures(&s, dirtyName, cleanName) || config.onlyPrintFailed {
 			continue
 		}
 		oldPath := filepath.Join(sourceDirectory, dirtyName)
 		if !config.quiet {
-			fmtEntry("SOURCE", oldPath)
+			s.fmtSource(oldPath)
 		}
 		for _, destination := range config.destinationDirectories {
 			newPath := filepath.Join(destination, cleanName)
 			if config.dryRun() {
-				fmtEntry("LINK??", newPath)
+				s.fmtLinkPreview(newPath)
 				continue
 			}
 			err := os.Link(oldPath, newPath)
 			if err != nil {
-				newPath := color.RedString("%q", newPath)
-				fmtSummary("ERROR:  %s: %v\n", newPath, err)
+				s.fmtError(newPath, err)
 			} else {
-				fmtEntry("LINKED", newPath)
+				s.fmtLink(newPath)
 			}
 		}
 	}
-	printSummary()
+	s.print()
 }
 
-func hasFailures(dirtyName string, fname string) bool {
-	printErr := func(s ...string) {
-		fmt.Fprintln(os.Stderr, s)
-	}
-
+func hasFailures(s *summary, dirtyName, fname string) bool {
 	if dirtyName == fname {
-		printErr("WARNING: filename cleaning failed")
-		printErr("\t- ", dirtyName)
-		printErr("\t+ ", fname)
+		s.fmtError(dirtyName, fmt.Errorf("failed to clean %q", fname))
 		return true
 	}
 	if invalidSubstrings(fname) != nil {
-		printErr("WARNING: filename cleaning left unorthodox runes in the name")
-		printErr("\t- ", dirtyName)
-		printErr("\t+ ", fname)
+		s.fmtError(dirtyName, fmt.Errorf("found offensive runes %q", fname))
 		return true
 	}
 	return false
@@ -247,12 +273,12 @@ func cleanFilename(filename string) string {
 		" (z-lib.org)", "",
 		" (Z-Library)", "",
 		"..", "",
-		"—", "-",
-		"⸺", "-",
-		"⸻", "-",
-		"﹘", "-",
-		"–", "-",
-		"‒", "-",
+		// "—", "-",
+		// "⸺", "-",
+		// "⸻", "-",
+		// "﹘", "-",
+		// "–", "-",
+		// "‒", "-",
 	)
 
 	filename = replacer.Replace(filename)
