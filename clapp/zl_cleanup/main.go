@@ -1,15 +1,18 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"dev.acorello.it/go/arkivist/clapp/zl_cleanup/fileset"
 	"github.com/fatih/color"
 )
 
@@ -45,6 +48,7 @@ var (
 	onlyFailedFlag      = flag.Bool("onlyfailed", false, "print only files that failed cleanup")
 	quietFlag           = flag.Bool("quiet", false, "do not print progress to stdout")
 	doRunFlag           = flag.Bool("run", false, "execute the operation")
+	doTrashFlag         = flag.Bool("trash", false, "trash successfully moved files")
 	sourceDirectoryFlag = flag.String("source", "", "directory containing files to clean-up")
 	summaryFlag         = flag.Bool("summary", false, "print list of final filenames at the end")
 )
@@ -59,6 +63,7 @@ type Config struct {
 	onlyPrintFailed        bool
 	quiet                  bool
 	doRun                  bool
+	doTrash                bool
 	sourceDirectory        string
 	summary                bool
 }
@@ -71,13 +76,19 @@ func (I Config) Errors() (errors []error) {
 	if I.doRun && I.onlyPrintFailed {
 		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
 	}
+	if I.doTrash && !I.doRun {
+		errors = append(errors, fmt.Errorf("'trash' makes sense only with 'run'"))
+	}
 	errors = append(errors, missingDirectoriesErrors(I.destinationDirectories...)...)
 	errors = append(errors, missingDirectoriesErrors(I.sourceDirectory)...)
 	return
 }
 
 func main() {
-	config := populateConfig()
+	config, err := populateConfig()
+	if err != nil {
+		log.Fatal("Error parsing config", err)
+	}
 
 	exitCode, stop := shouldStop(config)
 	if stop {
@@ -89,7 +100,7 @@ func main() {
 
 func shouldStop(config Config) (exitCode int, stop bool) {
 	if *justPrintConfigFlag {
-		fmt.Printf("%#v\n", config)
+		fmt.Printf("%+v\n", config)
 		stop = true
 	}
 	errors := config.Errors()
@@ -134,69 +145,96 @@ func directoryExists(path string) bool {
 	return true
 }
 
-func populateConfig() Config {
+func populateConfig() (config Config, err error) {
 	flag.Parse()
-	config := Config{
+	config = Config{
 		destinationDirectories: *destinationsDirectoryFlag,
 		onlyPrintFailed:        *onlyFailedFlag,
 		quiet:                  *quietFlag,
 		doRun:                  *doRunFlag,
+		doTrash:                *doTrashFlag,
 		sourceDirectory:        *sourceDirectoryFlag,
 		summary:                *summaryFlag,
 	}
 	if len(config.destinationDirectories) == 0 {
 		config.destinationDirectories = []string{config.sourceDirectory}
 	}
-	return config
+	config.sourceDirectory, err = filepath.Abs(config.sourceDirectory)
+	if err != nil {
+		return config, errors.Join(errors.New("filepath.Abs(<source-directory>) failed"), err)
+	}
+	for i, dir := range config.destinationDirectories {
+		config.destinationDirectories[i], err = filepath.Abs(dir)
+		if err != nil {
+			return config, errors.Join(errors.New("filepath.Abs(<destination-directory>) failed"), err)
+		}
+	}
+	return config, nil
 }
 
-type summary struct {
+type Summary struct {
 	out strings.Builder
 	err strings.Builder
 	Config
 }
 
-func (I *summary) fmtSummary(format string, a ...any) {
+func (I *Summary) fmtSummary(format string, a ...any) {
 	if I.quiet {
 		return
 	}
 	I.out.WriteString(fmt.Sprintf(format, a...))
 }
 
-func (I *summary) fmtErr(format string, a ...any) {
+func (I *Summary) fmtErr(format string, a ...any) {
 	if I.quiet {
 		return
 	}
 	I.err.WriteString(fmt.Sprintf(format, a...))
 }
 
-func (I *summary) fmtEntry(header, dirPath, fileName string) {
+func (I *Summary) Entry(header, dirPath, fileName string) {
 	header = color.GreenString(header + ":")
 	I.fmtSummary("%s %s\n\t%s\n", header, dirPath, fileName)
 }
-func (I *summary) fmtSource(filePath string) {
+func (I *Summary) Source(filePath string) {
 	fileName := filepath.Base(filePath)
-	fileName = color.CyanString("%s", fileName)
+	fileName = color.HiGreenString("%s", fileName)
 	dirPath := filepath.Dir(filePath)
-	dirPath = color.BlackString("%s", dirPath)
-	I.fmtEntry("SOURCE", dirPath, fileName)
+	dirPath = color.GreenString("%s", dirPath)
+	I.Entry("SOURCE", dirPath, fileName)
 }
-func (I *summary) fmtLinkPreview(filePath string) {
+func (I *Summary) LinkPreview(oldPath, filePath string) {
 	fileName := filepath.Base(filePath)
-	fileName = color.CyanString("%s", fileName)
+	fileName = color.HiWhiteString("%s", fileName)
 	dirPath := filepath.Dir(filePath)
-	dirPath = color.BlackString("%s", dirPath)
-	I.fmtEntry("LINK??", dirPath, fileName)
+	dirPath = color.WhiteString("%s", dirPath)
+	I.Entry("LINK??", dirPath, fileName)
 }
-func (I *summary) fmtLink(filePath string) {
+func (I *Summary) Linked(oldPath, filePath string) {
 	fileName := filepath.Base(filePath)
-	fileName = color.CyanString("%s", fileName)
+	fileName = color.HiCyanString("%s", fileName)
 	dirPath := filepath.Dir(filePath)
-	dirPath = color.BlackString("%s", dirPath)
-	I.fmtEntry("LINKED", dirPath, fileName)
+	dirPath = color.CyanString("%s", dirPath)
+	I.Entry("LINKED", dirPath, fileName)
 }
 
-func (I *summary) fmtError(filePath string, err error) {
+func (I *Summary) Homonym(oldPath, filePath string) {
+	fileName := filepath.Base(filePath)
+	fileName = color.HiBlueString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.BlueString("%s", dirPath)
+	I.Entry("HMONYM", dirPath, fileName)
+}
+
+func (I *Summary) Trashing(filePath string) {
+	fileName := filepath.Base(filePath)
+	fileName = color.HiYellowString("%s", fileName)
+	dirPath := filepath.Dir(filePath)
+	dirPath = color.YellowString("%s", dirPath)
+	I.Entry("TRASHING", dirPath, fileName)
+}
+
+func (I *Summary) Error(oldPath, filePath string, err error) {
 	fileName := filepath.Base(filePath)
 	fileName = color.RedString("%s", fileName)
 	dirPath := filepath.Dir(filePath)
@@ -206,11 +244,11 @@ func (I *summary) fmtError(filePath string, err error) {
 	I.fmtErr("%s %s\n\t%s\n\t%s\n", header, dirPath, fileName, errMessage)
 }
 
-func (I *summary) Len() int {
+func (I *Summary) Len() int {
 	return I.out.Len() + I.err.Len()
 }
 
-func (I *summary) print() {
+func (I *Summary) Print() {
 	if !I.quiet && I.Len() == 0 {
 		I.fmtSummary("Nothing to report\n")
 	}
@@ -218,50 +256,86 @@ func (I *summary) print() {
 	fmt.Fprint(os.Stderr, I.err.String())
 }
 
-func newSummary(config Config) summary {
-	return summary{
+func NewSummary(config Config) Summary {
+	return Summary{
 		Config: config,
 	}
+}
 
+func fileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return !os.IsNotExist(err)
 }
 
 func linkToCleanPath(config Config) {
-	s := newSummary(config)
+	report := NewSummary(config)
 	sourceDirectory := config.sourceDirectory
+	successfullyLinkedFiles := fileset.New()
 	for _, dirtyFile := range dirtyFiles(sourceDirectory) {
 		dirtyName := dirtyFile.Name()
 		cleanName := cleanFilename(dirtyName)
-		if hasFailures(&s, dirtyName, cleanName) || config.onlyPrintFailed {
+		if hasFailures(&report, dirtyName, cleanName) || config.onlyPrintFailed {
 			continue
 		}
 		oldPath := filepath.Join(sourceDirectory, dirtyName)
-		if !config.quiet {
-			s.fmtSource(oldPath)
-		}
+		successfullyLinkedFiles.Add(oldPath) //assume ok, remove if err
 		for _, destination := range config.destinationDirectories {
 			newPath := filepath.Join(destination, cleanName)
 			if config.dryRun() {
-				s.fmtLinkPreview(newPath)
-				continue
-			}
-			err := os.Link(oldPath, newPath)
-			if err != nil {
-				s.fmtError(newPath, err)
+				if fileExists(newPath) {
+					report.Homonym(oldPath, newPath)
+				} else {
+					report.LinkPreview(oldPath, newPath)
+				}
 			} else {
-				s.fmtLink(newPath)
+				err := os.Link(oldPath, newPath).(*os.LinkError)
+				switch {
+				case err == nil:
+					report.Linked(oldPath, newPath)
+				case errors.Is(err, os.ErrExist):
+					report.Homonym(oldPath, newPath)
+				default:
+					report.Error(err.Old, err.New, err.Err)
+					successfullyLinkedFiles.Remove(oldPath)
+				}
 			}
 		}
 	}
-	s.print()
+	if config.doTrash {
+		tryTrash(successfullyLinkedFiles, &report)
+	}
+	report.Print()
 }
 
-func hasFailures(s *summary, dirtyName, fname string) bool {
+func tryTrash(movedFiles fileset.FileSet, report *Summary) {
+	var fileNames strings.Builder
+	for fileName := range movedFiles {
+		report.Trashing(fileName)
+		if fileNames.Len() > 0 {
+			fileNames.WriteString(", ")
+		}
+		fileNames.WriteString(fmt.Sprintf(`POSIX file "%s"`, fileName))
+	}
+	if len(movedFiles) > 0 {
+		osascript := fmt.Sprintf(`tell application "Finder" to delete {%s}`, fileNames.String())
+		println(osascript)
+		cmd := exec.Command("osascript", "-e", osascript)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			report.fmtSummary(color.RedString("ERROR TRASHING FILES:\n%s"), out)
+		} else {
+			report.fmtSummary(color.GreenString("TRASHED OK:\n%s"), out)
+		}
+	}
+}
+
+func hasFailures(s *Summary, dirtyName, fname string) bool {
 	if dirtyName == fname {
-		s.fmtError(dirtyName, fmt.Errorf("failed to clean %q", fname))
+		s.Error(dirtyName, fname, fmt.Errorf("name hasn't changed"))
 		return true
 	}
 	if invalidSubstrings(fname) != nil {
-		s.fmtError(dirtyName, fmt.Errorf("found offensive runes %q", fname))
+		s.Error(dirtyName, fname, fmt.Errorf("found offensive runes"))
 		return true
 	}
 	return false

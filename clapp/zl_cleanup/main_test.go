@@ -8,7 +8,10 @@ import (
 )
 
 func TryRun(t *testing.T) {
-	config := populateConfig()
+	config, err := populateConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
 	linkToCleanPath(config)
 }
 
