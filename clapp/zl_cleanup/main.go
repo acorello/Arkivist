@@ -318,7 +318,6 @@ func tryTrash(movedFiles fileset.FileSet, report *Summary) {
 	}
 	if len(movedFiles) > 0 {
 		osascript := fmt.Sprintf(`tell application "Finder" to delete {%s}`, fileNames.String())
-		println(osascript)
 		cmd := exec.Command("osascript", "-e", osascript)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
