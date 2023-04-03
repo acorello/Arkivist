@@ -288,9 +288,9 @@ func linkToCleanPath(config Config) {
 					report.LinkPreview(oldPath, newPath)
 				}
 			} else {
-				err := os.Link(oldPath, newPath).(*os.LinkError)
+				err, gotErr := os.Link(oldPath, newPath).(*os.LinkError)
 				switch {
-				case err == nil:
+				case !gotErr:
 					report.Linked(oldPath, newPath)
 				case errors.Is(err, os.ErrExist):
 					report.Homonym(oldPath, newPath)
