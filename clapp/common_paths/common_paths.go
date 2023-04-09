@@ -18,7 +18,6 @@ func main() {
 	dirs := validatedArgs()
 	uniqueFiles := fileSet{}
 	first := true
-	// what is the algorithm to traverse
 	// (->> dirSet (map list-files) (map set) set/intersection)
 	for d := range dirs {
 		currentSet := fileSet{}
@@ -36,25 +35,25 @@ func main() {
 			continue
 		}
 		commonFiles := fileSet{}
-		for d := range uniqueFiles {
-			_, found := currentSet[d]
+		for f := range currentSet {
+			_, found := uniqueFiles[f]
 			if found {
-				commonFiles.Add(d)
+				commonFiles.Add(f)
 			}
 		}
 		uniqueFiles = commonFiles
 	}
 	for f := range uniqueFiles {
-		fmt.Printf("%s\n", f)
+		fmt.Println(f)
 	}
 }
 
-func mustGetRelativePath(d string, path string) string {
-	path, err := filepath.Rel(d, path)
+func mustGetRelativePath(baseDir string, path string) string {
+	relPath, err := filepath.Rel(baseDir, path)
 	if err != nil {
 		panic(err)
 	}
-	return path
+	return relPath
 }
 
 func validatedArgs() fileSet {
