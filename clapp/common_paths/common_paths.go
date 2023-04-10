@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"dev.acorello.it/go/arkivist/pathset"
+	"dev.acorello.it/go/arkivist/sets"
 )
 
 // Given two or more unique directories as arguments
@@ -31,7 +31,7 @@ import (
 // The output is the intersection of the set of subpaths of each directory.
 func main() {
 	dirs := validatedDirs()
-	uniqueFiles := pathset.New()
+	uniqueFiles := sets.New[string]()
 	// (->> dirSet (map list-files) (map set) set/intersection)
 	for i, d := range dirs.Entries() {
 		if i == 0 {
@@ -42,7 +42,7 @@ func main() {
 			// whenever I end up with an empty set there is no point in continuing
 			break
 		}
-		currentSet := pathset.New()
+		currentSet := sets.New[string]()
 		collectPaths(d, currentSet)
 		// from the the second iteration onwards I have to collect the paths I've already seen and carry over only those ones.
 		uniqueFiles = uniqueFiles.Intersection(currentSet)
@@ -52,7 +52,7 @@ func main() {
 	}
 }
 
-func collectPaths(dirCleanPath string, currentSet pathset.PathSet) {
+func collectPaths(dirCleanPath string, currentSet sets.Set[string]) {
 	// `dirCleanPath` should always be a clean path for the `relPathOrPanic` to work
 	filepath.WalkDir(dirCleanPath, func(path string, info fs.DirEntry, err error) error {
 		if info.IsDir() {
@@ -72,8 +72,8 @@ func relPathOrPanic(baseDir string, path string) string {
 	return relPath
 }
 
-func validatedDirs() pathset.PathSet {
-	dirs := pathset.New()
+func validatedDirs() sets.Set[string] {
+	dirs := sets.New[string]()
 	for _, d := range os.Args[1:] {
 		a, err := filepath.Abs(d)
 		// absolute path
