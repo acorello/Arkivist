@@ -35,7 +35,7 @@ func main() {
 	// (->> dirSet (map list-files) (map set) set/intersection)
 	for i, d := range dirs.Entries() {
 		if i == 0 {
-			collectPaths(d, uniqueFiles)
+			collectRelFilePaths(d, uniqueFiles.Add)
 			continue
 		}
 		if uniqueFiles.IsEmpty() {
@@ -43,7 +43,7 @@ func main() {
 			break
 		}
 		currentSet := sets.New[string]()
-		collectPaths(d, currentSet)
+		collectRelFilePaths(d, currentSet.Add)
 		// from the the second iteration onwards I have to collect the paths I've already seen and carry over only those ones.
 		uniqueFiles = uniqueFiles.Intersection(currentSet)
 	}
@@ -52,14 +52,14 @@ func main() {
 	}
 }
 
-func collectPaths(dirCleanPath string, currentSet sets.Set[string]) {
+func collectRelFilePaths(dirCleanPath string, collect func(string)) {
 	// `dirCleanPath` should always be a clean path for the `relPathOrPanic` to work
 	filepath.WalkDir(dirCleanPath, func(path string, info fs.DirEntry, err error) error {
 		if info.IsDir() {
 			return nil
 		}
 		relPath := relPathOrPanic(dirCleanPath, path)
-		currentSet.Add(relPath)
+		collect(relPath)
 		return nil
 	})
 }
