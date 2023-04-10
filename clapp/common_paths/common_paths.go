@@ -6,49 +6,65 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"dev.acorello.it/go/arkivist/pathset"
 )
 
-type fileSet map[string]struct{}
-
-func (I fileSet) Add(a string) {
-	I[a] = struct{}{}
-}
-
+// Given two or more unique directories as arguments
+// Output the file paths they have in common; empty directories are ignored.
+//
+// Es:
+//
+//	DIR1/
+//		A/a.txt
+//		B/b.txt
+//		D/
+//	DIR2/
+//		A/a.txt
+//		C/c.txt
+//		D/
+//
+// Outputs `A/a.txt`
+//
+// Input directories are converted to absolute paths and normalized before being compared.
+//
+// The output is the intersection of the set of subpaths of each directory.
 func main() {
-	dirs := validatedArgs()
-	uniqueFiles := fileSet{}
-	first := true
+	dirs := validatedDirs()
+	uniqueFiles := pathset.New()
 	// (->> dirSet (map list-files) (map set) set/intersection)
-	for d := range dirs {
-		currentSet := fileSet{}
-		filepath.WalkDir(d, func(path string, info fs.DirEntry, err error) error {
-			if info.IsDir() {
-				return nil
-			}
-			path = mustGetRelativePath(d, path)
-			currentSet.Add(path)
-			return nil
-		})
-		if first {
-			uniqueFiles = currentSet
-			first = false
+	for i, d := range dirs.Entries() {
+		if i == 0 {
+			collectPaths(d, uniqueFiles)
 			continue
 		}
-		commonFiles := fileSet{}
-		for f := range currentSet {
-			_, found := uniqueFiles[f]
-			if found {
-				commonFiles.Add(f)
-			}
+		if uniqueFiles.IsEmpty() {
+			// whenever I end up with an empty set there is no point in continuing
+			break
 		}
-		uniqueFiles = commonFiles
+		currentSet := pathset.New()
+		collectPaths(d, currentSet)
+		// from the the second iteration onwards I have to collect the paths I've already seen and carry over only those ones.
+		uniqueFiles = uniqueFiles.Intersection(currentSet)
 	}
 	for f := range uniqueFiles {
 		fmt.Println(f)
 	}
 }
 
-func mustGetRelativePath(baseDir string, path string) string {
+func collectPaths(dirCleanPath string, currentSet pathset.PathSet) {
+	// `dirCleanPath` should always be a clean path for the `relPathOrPanic` to work
+	filepath.WalkDir(dirCleanPath, func(path string, info fs.DirEntry, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		relPath := relPathOrPanic(dirCleanPath, path)
+		currentSet.Add(relPath)
+		return nil
+	})
+}
+
+func relPathOrPanic(baseDir string, path string) string {
 	relPath, err := filepath.Rel(baseDir, path)
 	if err != nil {
 		panic(err)
@@ -56,8 +72,8 @@ func mustGetRelativePath(baseDir string, path string) string {
 	return relPath
 }
 
-func validatedArgs() fileSet {
-	dirs := fileSet{}
+func validatedDirs() pathset.PathSet {
+	dirs := pathset.New()
 	for _, d := range os.Args[1:] {
 		a, err := filepath.Abs(d)
 		// absolute path
