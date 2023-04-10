@@ -63,13 +63,13 @@ func collectRelFilePaths(dirCleanPath string, collect func(string)) {
 		}
 		relPath, err := filepath.Rel(dirCleanPath, path)
 		if err != nil {
-			panic(err)
+			log.Panicf("failed to relativize path %q based on %q: %s", path, dirCleanPath, err.Error())
 		}
 		collect(relPath)
 		return nil
 	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error while traversing dir %q: %s", dirCleanPath, err.Error())
 	}
 }
 
