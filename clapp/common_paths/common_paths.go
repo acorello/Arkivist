@@ -54,22 +54,23 @@ func main() {
 
 func collectRelFilePaths(dirCleanPath string, collect func(string)) {
 	// `dirCleanPath` should always be a clean path for the `relPathOrPanic` to work
-	filepath.WalkDir(dirCleanPath, func(path string, info fs.DirEntry, err error) error {
+	err := filepath.WalkDir(dirCleanPath, func(path string, info fs.DirEntry, stumbled error) error {
+		if stumbled != nil {
+			return stumbled
+		}
 		if info.IsDir() {
 			return nil
 		}
-		relPath := relPathOrPanic(dirCleanPath, path)
+		relPath, err := filepath.Rel(dirCleanPath, path)
+		if err != nil {
+			panic(err)
+		}
 		collect(relPath)
 		return nil
 	})
-}
-
-func relPathOrPanic(baseDir string, path string) string {
-	relPath, err := filepath.Rel(baseDir, path)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	return relPath
 }
 
 func validatedDirs() sets.Set[string] {
