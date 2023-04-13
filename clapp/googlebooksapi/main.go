@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 	"gopkg.in/yaml.v3"
 )
 

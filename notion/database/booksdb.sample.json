@@ -1,0 +1,361 @@
+{
+  "object": "database",
+  "id": "d4f844f4-e08d-4113-9ec1-131fa6624399",
+  "cover": {
+    "type": "external",
+    "external": {
+      "url": "https://images.unsplash.com/photo-1535905557558-afc4877a26fc?ixlib=rb-1.2.1&q=80&cs=tinysrgb&fm=jpg&crop=entropy"
+    }
+  },
+  "icon": {
+    "type": "emoji",
+    "emoji": "📚"
+  },
+  "created_time": "2022-07-06T12:18:00.000Z",
+  "created_by": {
+    "object": "user",
+    "id": "fe55ce0b-11c9-4a16-9371-7018621d445c"
+  },
+  "last_edited_by": {
+    "object": "user",
+    "id": "fe55ce0b-11c9-4a16-9371-7018621d445c"
+  },
+  "last_edited_time": "2023-04-12T08:02:00.000Z",
+  "title": [
+    {
+      "type": "text",
+      "text": {
+        "content": "Books",
+        "link": null
+      },
+      "annotations": {
+        "bold": false,
+        "italic": false,
+        "strikethrough": false,
+        "underline": false,
+        "code": false,
+        "color": "default"
+      },
+      "plain_text": "Books",
+      "href": null
+    }
+  ],
+  "description": [],
+  "is_inline": false,
+  "properties": {
+    "Status": {
+      "id": "%3Bpwg",
+      "name": "Status",
+      "type": "status",
+      "status": {
+        "options": [
+          {
+            "id": "dtXd",
+            "name": "Aborted",
+            "color": "purple"
+          },
+          {
+            "id": "yWuO",
+            "name": "On Hold",
+            "color": "orange"
+          },
+          {
+            "id": "5440f20e-edbe-419a-8cf5-0f078d091ff1",
+            "name": "Not started",
+            "color": "default"
+          },
+          {
+            "id": "f4827c3d-c2be-4b30-8666-73badd4c6a35",
+            "name": "In progress",
+            "color": "blue"
+          },
+          {
+            "id": "2cdf2b2e-dd7f-404c-85f3-2dc6ab0819b3",
+            "name": "Done",
+            "color": "green"
+          }
+        ],
+        "groups": [
+          {
+            "id": "726d34dd-17cb-47f4-9412-13e435f3ddde",
+            "name": "To-do",
+            "color": "gray",
+            "option_ids": ["5440f20e-edbe-419a-8cf5-0f078d091ff1"]
+          },
+          {
+            "id": "4d578be9-bc07-4069-9686-b096e812b7a3",
+            "name": "In progress",
+            "color": "blue",
+            "option_ids": ["yWuO", "f4827c3d-c2be-4b30-8666-73badd4c6a35"]
+          },
+          {
+            "id": "a7491e12-ec91-4b74-bdeb-3f7b4104b632",
+            "name": "Complete",
+            "color": "green",
+            "option_ids": ["dtXd", "2cdf2b2e-dd7f-404c-85f3-2dc6ab0819b3"]
+          }
+        ]
+      }
+    },
+    "Pub. Date": {
+      "id": "ER%40%5C",
+      "name": "Pub. Date",
+      "type": "date",
+      "date": {}
+    },
+    "ISBN": {
+      "id": "KLWn",
+      "name": "ISBN",
+      "type": "number",
+      "number": {
+        "format": "number"
+      }
+    },
+    "Publisher": {
+      "id": "Uww%7C",
+      "name": "Publisher",
+      "type": "select",
+      "select": {
+        "options": [
+          {
+            "id": "ccw`",
+            "name": "Prag. Prog.",
+            "color": "green"
+          },
+          {
+            "id": "jX`>",
+            "name": "O'Reilly",
+            "color": "purple"
+          },
+          {
+            "id": "=JNv",
+            "name": "Manning",
+            "color": "blue"
+          },
+          {
+            "id": "8ce12d7b-6f7c-4db8-836b-d3dc8427f0a2",
+            "name": "ACM Books",
+            "color": "purple"
+          },
+          {
+            "id": "0ef85af1-181a-41bd-be2a-5ceaae4f7024",
+            "name": "No Starch Press",
+            "color": "yellow"
+          },
+          {
+            "id": "7ce1aa06-69ac-4d2f-830a-4315c4c5ec85",
+            "name": "University of Minnesota",
+            "color": "brown"
+          },
+          {
+            "id": "dcd0ce45-0bda-47be-ac5b-abc57daa63f3",
+            "name": "Addison-Wesley Pro…",
+            "color": "blue"
+          },
+          {
+            "id": "01a6d1b8-24a3-44ce-ade8-50a5503c20d9",
+            "name": "Penguin",
+            "color": "orange"
+          },
+          {
+            "id": "4adec19e-26cc-4118-bc06-9ffff5d1efb3",
+            "name": "Wrox",
+            "color": "red"
+          },
+          {
+            "id": "a5d9096a-3998-4c3d-b572-ad444dbdefb3",
+            "name": "Apress",
+            "color": "yellow"
+          },
+          {
+            "id": "7606bb51-2987-4b49-a6bc-0b4e2054a166",
+            "name": "Self-Published",
+            "color": "default"
+          },
+          {
+            "id": "50c1fc25-86da-4913-80c9-d10d69d18f9f",
+            "name": "Cambridge University Press",
+            "color": "gray"
+          },
+          {
+            "id": "f3ab8c54-dac6-4fa2-a74e-abef3739848e",
+            "name": "Springer",
+            "color": "pink"
+          }
+        ]
+      }
+    },
+    "Edition": {
+      "id": "Xue%5C",
+      "name": "Edition",
+      "type": "number",
+      "number": {
+        "format": "number"
+      }
+    },
+    "Authors": {
+      "id": "Y%3BDB",
+      "name": "Authors",
+      "type": "rich_text",
+      "rich_text": {}
+    },
+    "⥥": {
+      "id": "%5CveC",
+      "name": "⥥",
+      "type": "checkbox",
+      "checkbox": {}
+    },
+    "Tags": {
+      "id": "fTA%60",
+      "name": "Tags",
+      "type": "multi_select",
+      "multi_select": {
+        "options": [
+          {
+            "id": "c7ce014c-9f0f-4607-8200-3a653f792d4d",
+            "name": "Clojure",
+            "color": "green"
+          },
+          {
+            "id": "e346ddeb-1220-4bcc-905f-6de3669ad895",
+            "name": "Description Logics",
+            "color": "purple"
+          },
+          {
+            "id": "bd459b81-4f9d-4f4d-9e61-75991d8f74b1",
+            "name": "Knowledge Graphs",
+            "color": "blue"
+          },
+          {
+            "id": "bf119937-769e-4fc1-9b36-60945b7ae54b",
+            "name": "Neo4J",
+            "color": "default"
+          },
+          {
+            "id": "b1aa8546-482e-436d-938f-50f0a5b52dea",
+            "name": "GraphQL",
+            "color": "pink"
+          },
+          {
+            "id": "8f0d965c-0a5b-4519-86ee-733770a5bfdc",
+            "name": "React",
+            "color": "orange"
+          },
+          {
+            "id": "5e50f6e4-9149-415f-83ca-164e5c9cfaa6",
+            "name": "NodeJS",
+            "color": "gray"
+          },
+          {
+            "id": "246be331-5fbd-471c-8175-984add093c13",
+            "name": "Manning",
+            "color": "red"
+          },
+          {
+            "id": "d6cf06a0-6db5-4ace-a206-89199a3091a3",
+            "name": "Semantic Modeling",
+            "color": "brown"
+          },
+          {
+            "id": "69b7df0b-5a25-4393-8d52-f45c0985ded6",
+            "name": "Semantic Web",
+            "color": "brown"
+          },
+          {
+            "id": "cf37da7a-f04a-4e9d-a699-2c922a6a65e5",
+            "name": "Software Engineering",
+            "color": "yellow"
+          },
+          {
+            "id": "a37bc451-7d2f-43c6-aff5-ad5e0275d7d4",
+            "name": "Python",
+            "color": "red"
+          },
+          {
+            "id": "0e7afcc7-145d-46a0-b430-b6eec8a51837",
+            "name": "Programming Language",
+            "color": "pink"
+          },
+          {
+            "id": "78508696-43da-4528-87eb-eeaf025c31bf",
+            "name": "Management",
+            "color": "pink"
+          },
+          {
+            "id": "6389260a-8f36-45ae-8019-1ba87ba28b58",
+            "name": "Deep Learning",
+            "color": "orange"
+          },
+          {
+            "id": "88f3bb73-4bb7-4e14-a079-2f6f6c1f3426",
+            "name": "Java",
+            "color": "default"
+          },
+          {
+            "id": "719ccb15-ad70-4490-9510-dbfe696d4f70",
+            "name": "Software Testing",
+            "color": "gray"
+          },
+          {
+            "id": "a02102ce-e62b-491b-bdbe-e12e1ccdc626",
+            "name": "DevOps",
+            "color": "pink"
+          },
+          {
+            "id": "f52bb632-e42d-492a-8dbb-960a07112171",
+            "name": "Business Process Management",
+            "color": "yellow"
+          },
+          {
+            "id": "0e098d92-9c43-46d5-8723-545c7349ee72",
+            "name": "Software Development",
+            "color": "default"
+          },
+          {
+            "id": "d7ef7333-bc80-414e-a29a-0799397a241b",
+            "name": "C",
+            "color": "yellow"
+          },
+          {
+            "id": "00af002c-3221-4164-afc3-a8a8877bf0d8",
+            "name": "Go",
+            "color": "blue"
+          },
+          {
+            "id": "3143941d-bfc3-442f-988c-99e71c9be456",
+            "name": "Strategy",
+            "color": "orange"
+          },
+          {
+            "id": "98ebdb0e-a58e-47d0-b55d-f319f302a25e",
+            "name": "Algorithms",
+            "color": "blue"
+          },
+          {
+            "id": "e7b0a038-dbd8-4816-b6ce-838f51ad5264",
+            "name": "REST",
+            "color": "blue"
+          }
+        ]
+      }
+    },
+    "URL": {
+      "id": "kII%3C",
+      "name": "URL",
+      "type": "url",
+      "url": {}
+    },
+    "Title": {
+      "id": "title",
+      "name": "Title",
+      "type": "title",
+      "title": {}
+    }
+  },
+  "parent": {
+    "type": "page_id",
+    "page_id": "af59f099-2137-4a4e-a5d2-b58c074ae8aa"
+  },
+  "url": "https://www.notion.so/d4f844f4e08d41139ec1131fa6624399",
+  "archived": false
+}

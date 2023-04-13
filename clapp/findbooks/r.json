@@ -1,0 +1,14 @@
+{
+    "parent": { "database_id": "" },
+    "properties": {
+      "title": {
+        "title": [
+          {
+            "text": {
+              "content": "Yurts in Big Sur, California"
+            }
+          }
+        ]
+      }
+    }
+  }
