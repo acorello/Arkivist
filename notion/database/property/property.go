@@ -106,22 +106,13 @@ func decodeProperty(data []byte, typ string) (Property, error) {
 	switch typ {
 	case "select":
 		var property Select
-		if err := json.Unmarshal(data, &property); err != nil {
-			return nil, err
-		}
-		return property, nil
+		return property, json.Unmarshal(data, &property)
 	case "created_time":
 		var property CreatedTime
-		if err := json.Unmarshal(data, &property); err != nil {
-			return nil, err
-		}
-		return property, nil
+		return property, json.Unmarshal(data, &property)
 	case "checkbox":
 		var property Checkbox
-		if err := json.Unmarshal(data, &property); err != nil {
-			return nil, err
-		}
-		return property, nil
+		return property, json.Unmarshal(data, &property)
 	default:
 		return nil, fmt.Errorf("type %q not implemented", typ)
 	}
