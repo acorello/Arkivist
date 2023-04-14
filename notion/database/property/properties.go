@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+type Property interface {
+	TypeId() string
+}
+
 type PropertiesByName map[string]Property
 
 func (I PropertiesByName) UnmarshalJSON(data []byte) error {

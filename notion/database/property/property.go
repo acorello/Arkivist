@@ -1,9 +1,6 @@
 // [doc] https://developers.notion.com/reference/property-object
 package property
 
-type Name string
-type Id string
-
 // List of property types.
 //
 // Extracted from [notion ref docs] with JS
@@ -30,13 +27,12 @@ var _ = [...]string{
 	"url",
 }
 
-type Property interface {
-	TypeId() string
-}
+type Id string
+type Name string
 
 type Checkbox struct {
-	Id   string
-	Name string
+	Id
+	Name
 }
 
 func (I Checkbox) TypeId() string {
@@ -44,8 +40,8 @@ func (I Checkbox) TypeId() string {
 }
 
 type Select struct {
-	Id   string
-	Name string
+	Id
+	Name
 	Data SelectData `json:"select"`
 }
 
@@ -58,14 +54,14 @@ type SelectData struct {
 }
 
 type SelectOption struct {
-	Id    string
-	Name  string
+	Id
+	Name
 	Color string
 }
 
 type CreatedTime struct {
-	Id   Id
-	Name Name
+	Id
+	Name
 }
 
 func (I CreatedTime) TypeId() string {
