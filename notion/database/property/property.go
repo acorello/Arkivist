@@ -1,4 +1,9 @@
-// [doc] https://developers.notion.com/reference/property-object
+// API documentation:
+//   - [resource types]
+//   - [developer docs]
+//
+// [resource types]: https://raw.githubusercontent.com/makenotion/notion-sdk-js/main/src/api-endpoints.ts
+// [developer docs]: https://developers.notion.com/reference/property-object
 package property
 
 // List of property types.
