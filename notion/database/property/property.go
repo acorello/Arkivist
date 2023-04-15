@@ -15,33 +15,39 @@ package property
 //	Array.from(nodes).map(el => el.outerText)
 //
 // [notion ref docs]: https://developers.notion.com/reference/property-object
-var _ = [...]string{
-	"created_by",
-	"created_time",
-	"date",
-	"email",
-	"formula",
-	"last_edited_by",
-	"last_edited_time",
-	"multi_select",
-	"options",
-	"phone_number",
-	"relation",
-	"rollup",
-	"select",
-	"url",
-}
+const (
+	checkboxTyId       TypeId = "checkbox"
+	createdByTyId      TypeId = "created_by"
+	createdTimeTyId    TypeId = "created_time"
+	dateTyId           TypeId = "date"
+	emailTyId          TypeId = "email"
+	formulaTyId        TypeId = "formula"
+	lastEditedByTyId   TypeId = "last_edited_by"
+	lastEditedTimeTyId TypeId = "last_edited_time"
+	multiSelectTyId    TypeId = "multi_select"
+	optionsTyId        TypeId = "options"
+	phoneNumberTyId    TypeId = "phone_number"
+	relationTyId       TypeId = "relation"
+	rollupTyId         TypeId = "rollup"
+	selectTyId         TypeId = "select"
+	urlTyId            TypeId = "url"
+)
 
 type Id string
 type Name string
+type TypeId string
+
+func (I TypeId) String() string {
+	return string(I)
+}
 
 type Checkbox struct {
 	Id
 	Name
 }
 
-func (I Checkbox) TypeId() string {
-	return "checkbox"
+func (I Checkbox) TypeId() TypeId {
+	return checkboxTyId
 }
 
 type Select struct {
@@ -50,8 +56,8 @@ type Select struct {
 	Data SelectData `json:"select"`
 }
 
-func (I Select) TypeId() string {
-	return "select"
+func (I Select) TypeId() TypeId {
+	return selectTyId
 }
 
 type SelectData struct {
@@ -69,6 +75,6 @@ type CreatedTime struct {
 	Name
 }
 
-func (I CreatedTime) TypeId() string {
-	return "created_time"
+func (I CreatedTime) TypeId() TypeId {
+	return createdTimeTyId
 }
