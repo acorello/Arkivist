@@ -1,10 +1,9 @@
-// API documentation:
-//   - [resource types]
-//   - [developer docs]
-//
-// [resource types]: https://raw.githubusercontent.com/makenotion/notion-sdk-js/main/src/api-endpoints.ts
-// [developer docs]: https://developers.notion.com/reference/property-object
 package property
+
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // List of property types.
 //
@@ -39,6 +38,24 @@ type TypeId string
 
 func (I TypeId) String() string {
 	return string(I)
+}
+
+func (I TypeId) unmarshal(data []byte) (Property, error) {
+	switch I {
+	case selectTyId:
+		var property Select
+		return property, json.Unmarshal(data, &property)
+	case createdTimeTyId:
+		var property CreatedTime
+		//lint:ignore SA9005 reason:unmarshaling works correctly with embedded tiny-types (Id, Name)
+		return property, json.Unmarshal(data, &property)
+	case checkboxTyId:
+		var property Checkbox
+		//lint:ignore SA9005 reason:unmarshaling works correctly with embedded tiny-types (Id, Name)
+		return property, json.Unmarshal(data, &property)
+	default:
+		return nil, fmt.Errorf("type %q not implemented", I)
+	}
 }
 
 type Checkbox struct {

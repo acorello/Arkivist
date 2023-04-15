@@ -35,29 +35,11 @@ func decodeProperty(data []byte) (Property, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read type: %v", err)
 	}
-	property, err := TypeId(typeId).decodeProperty(data)
+	property, err := TypeId(typeId).unmarshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode property of type %q: %v", typeId, err)
 	}
 	return property, nil
-}
-
-func (I TypeId) decodeProperty(data []byte) (Property, error) {
-	switch I {
-	case selectTyId:
-		var property Select
-		return property, json.Unmarshal(data, &property)
-	case createdTimeTyId:
-		var property CreatedTime
-		//lint:ignore SA9005 reason:unmarshaling works correctly with embedded tiny-types (Id, Name)
-		return property, json.Unmarshal(data, &property)
-	case checkboxTyId:
-		var property Checkbox
-		//lint:ignore SA9005 reason:unmarshaling works correctly with embedded tiny-types (Id, Name)
-		return property, json.Unmarshal(data, &property)
-	default:
-		return nil, fmt.Errorf("type %q not implemented", I)
-	}
 }
 
 type mapOfRawJSON map[string]json.RawMessage
