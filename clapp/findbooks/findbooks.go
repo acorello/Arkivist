@@ -23,6 +23,7 @@ func main() {
 	end
 	*/
 	patternFlag := flag.String("name", "", "pattern for kMDItemDispalyName")
+	verboseFlag := flag.Bool("verbose", false, "print mdfind command")
 	flag.Parse()
 	quoteEscaper := strings.NewReplacer(`'`, `\'`, `"`, `\"`)
 	pattern := quoteEscaper.Replace(*patternFlag)
@@ -35,6 +36,9 @@ func main() {
 	}
 	query := fmt.Sprintf("kMDItemDisplayName = '%s'c", pattern)
 	mdfind := exec.Command("mdfind", "-onlyin", booksPath, query)
+	if *verboseFlag {
+		fmt.Printf("> %s %s %q %q\n", mdfind.Args[0], mdfind.Args[1], mdfind.Args[2], mdfind.Args[3])
+	}
 	rawResult, err := mdfind.CombinedOutput()
 	if err != nil {
 		log.Fatal(err)
