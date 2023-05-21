@@ -8,7 +8,7 @@ import (
 func MustOpen(filepath string) *os.File {
 	r, err := os.Open(filepath)
 	if err != nil {
-		log.Fatal()
+		log.Fatal(err)
 	}
 	return r
 }
