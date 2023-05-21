@@ -24,6 +24,7 @@ func main() {
 	*/
 	patternFlag := flag.String("name", "", "pattern for kMDItemDispalyName")
 	verboseFlag := flag.Bool("verbose", false, "print mdfind command")
+	explicitPathFlag := flag.Bool("explicitpath", false, "print explicit path of result (no env vars)")
 	flag.Parse()
 	quoteEscaper := strings.NewReplacer(`'`, `\'`, `"`, `\"`)
 	pattern := quoteEscaper.Replace(*patternFlag)
@@ -50,9 +51,13 @@ func main() {
 		if len(line) == 0 {
 			continue
 		}
-		out.WriteString("$")
-		out.WriteString(searchPath)
-		out.WriteString(line[prefixLen:])
+		if *explicitPathFlag {
+			out.WriteString(line)
+		} else {
+			out.WriteString("$")
+			out.WriteString(searchPath)
+			out.WriteString(line[prefixLen:])
+		}
 		fmt.Println(out.String())
 		out.Reset()
 	}
