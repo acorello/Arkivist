@@ -1,4 +1,11 @@
 // # mdfw (mdfind wrapper) an easier API for common mdfind searches
+// findbooks this words should be all present
+//
+// mdfind query language:
+// `(` ‹query› `)` grouping
+// `( ‹p1› || ‹p2› )` either one of the two predicates
+// `( ‹p1› && p2 )` either one of the two predicates
+// `attributeName = regex [flags]`
 package main
 
 import (
@@ -11,9 +18,14 @@ import (
 	"strings"
 )
 
-const searchPath = "mybooks"
+const searchPathVariable = "mybooks"
+
+var patternFlag = flag.String("name", "", "pattern for kMDItemDispalyName")
+var verboseFlag = flag.Bool("verbose", false, "print mdfind command")
+var explicitPathFlag = flag.Bool("explicitpath", false, "print explicit path of result (no env vars)")
 
 func main() {
+	flag.Parse()
 	/* #!/usr/bin/env fish
 	# initial draft implementation in fish
 	function findbooks -a pattern -d "Seach in \$mybooks given pattern via `mdfind`"
@@ -22,21 +34,9 @@ func main() {
 	    mdfind -onlyin $mybooks "kMDItemDisplayName = '$pattern'c" | string sub -s $prefixLen
 	end
 	*/
-	patternFlag := flag.String("name", "", "pattern for kMDItemDispalyName")
-	verboseFlag := flag.Bool("verbose", false, "print mdfind command")
-	explicitPathFlag := flag.Bool("explicitpath", false, "print explicit path of result (no env vars)")
-	flag.Parse()
-	quoteEscaper := strings.NewReplacer(`'`, `\'`, `"`, `\"`)
-	pattern := quoteEscaper.Replace(*patternFlag)
-	booksPath, found := os.LookupEnv(searchPath)
-	if !found {
-		log.Fatalf("Can't find $%s", searchPath)
-	}
-	if fs.ValidPath(booksPath) {
-		log.Fatalf("$%s not has a valid path: %s", searchPath, booksPath)
-	}
-	query := fmt.Sprintf("kMDItemDisplayName = '%s'c", pattern)
-	mdfind := exec.Command("mdfind", "-onlyin", booksPath, query)
+	searchPath := lookupAndValidateDir(searchPathVariable)
+	query := buildQuery(*patternFlag)
+	mdfind := exec.Command("mdfind", "-onlyin", searchPath, query)
 	if *verboseFlag {
 		fmt.Printf("> %s %s %q %q\n", mdfind.Args[0], mdfind.Args[1], mdfind.Args[2], mdfind.Args[3])
 	}
@@ -44,10 +44,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	result := strings.Split(string(rawResult), "\n")
-	prefixLen := len(booksPath)
+	results := strings.Split(string(rawResult), "\n")
+	printResults(searchPath, results)
+}
+
+func lookupAndValidateDir(envVariable string) string {
+	dirPath, found := os.LookupEnv(envVariable)
+	if !found {
+		log.Fatalf("Can't find $%s", envVariable)
+	}
+	if fs.ValidPath(dirPath) {
+		log.Fatalf("$%s not has a valid path: %s", envVariable, dirPath)
+	}
+	return dirPath
+}
+
+func buildQuery(pattern string) string {
+	quoteEscaper := strings.NewReplacer(`'`, `\'`, `"`, `\"`)
+	pattern = quoteEscaper.Replace(pattern)
+	query := fmt.Sprintf("kMDItemDisplayName = '%s'c", pattern)
+	return query
+}
+
+func printResults(searchPath string, results []string) {
 	var out strings.Builder
-	for _, line := range result {
+	prefixLen := len(searchPath)
+	for _, line := range results {
 		if len(line) == 0 {
 			continue
 		}
@@ -55,7 +77,7 @@ func main() {
 			out.WriteString(line)
 		} else {
 			out.WriteString("$")
-			out.WriteString(searchPath)
+			out.WriteString(searchPathVariable)
 			out.WriteString(line[prefixLen:])
 		}
 		fmt.Println(out.String())
