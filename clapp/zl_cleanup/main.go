@@ -308,6 +308,9 @@ func linkToCleanPath(config Config) {
 }
 
 func tryTrash(movedFiles fileset.FileSet, report *Summary) {
+	if movedFiles.IsEmpty() {
+		return
+	}
 	var fileNames strings.Builder
 	for fileName := range movedFiles {
 		report.Trashing(fileName)
@@ -316,15 +319,13 @@ func tryTrash(movedFiles fileset.FileSet, report *Summary) {
 		}
 		fileNames.WriteString(fmt.Sprintf(`POSIX file "%s"`, fileName))
 	}
-	if len(movedFiles) > 0 {
-		osascript := fmt.Sprintf(`tell application "Finder" to delete {%s}`, fileNames.String())
-		cmd := exec.Command("osascript", "-e", osascript)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			report.fmtSummary(color.RedString("ERROR TRASHING FILES:\n%s"), out)
-		} else {
-			report.fmtSummary(color.GreenString("TRASHED OK:\n%s"), out)
-		}
+	osascript := fmt.Sprintf(`tell application "Finder" to delete {%s}`, fileNames.String())
+	cmd := exec.Command("osascript", "-e", osascript)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		report.fmtSummary(color.RedString("ERROR TRASHING FILES:\n%s"), out)
+	} else {
+		report.fmtSummary(color.GreenString("TRASHED OK:\n%s"), out)
 	}
 }
 

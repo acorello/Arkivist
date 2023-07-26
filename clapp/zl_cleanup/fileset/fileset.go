@@ -15,3 +15,7 @@ func (I *FileSet) Add(filename string) {
 func (I *FileSet) Remove(filename string) {
 	delete(*I, filename)
 }
+
+func (I FileSet) IsEmpty() bool {
+	return len(I) == 0
+}
