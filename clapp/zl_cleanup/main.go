@@ -334,8 +334,15 @@ func hasFailures(s *Summary, dirtyName, fname string) bool {
 		s.Error(dirtyName, fname, fmt.Errorf("name hasn't changed"))
 		return true
 	}
-	if invalidSubstrings(fname) != nil {
-		s.Error(dirtyName, fname, fmt.Errorf("found offensive runes"))
+	if substrings := invalidSubstrings(fname); substrings != nil {
+		var sb strings.Builder
+		for _, sub := range substrings {
+			if sb.Len() > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("%d: %s", sub.position, sub.value))
+		}
+		s.Error(dirtyName, fname, fmt.Errorf("found offensive runes at [%s]", sb.String()))
 		return true
 	}
 	return false
@@ -347,7 +354,11 @@ type invalidSubstring struct {
 }
 
 func invalidSubstrings(fname string) (res []invalidSubstring) {
-	valid := regexp.MustCompile(`[^ •’\p{L}\p{N}\p{P}]`)
+	// \p{L} any letter
+	// \p{N} any number
+	// \p{P} any punctuation
+	// \p{Mn} non-spacing marks
+	valid := regexp.MustCompile(`[^ •’\p{L}\p{N}\p{P}\p{Mn}]`)
 	for _, stringIndices := range valid.FindAllStringIndex(fname, -1) {
 		from := stringIndices[0]
 		ntil := stringIndices[1]
