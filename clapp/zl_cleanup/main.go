@@ -346,7 +346,7 @@ type invalidSubstring struct {
 }
 
 func invalidSubstrings(fname string) (res []invalidSubstring) {
-	valid := regexp.MustCompile(`[^ •’\p{Latin}\p{Nd}[:punct:]]`)
+	valid := regexp.MustCompile(`[^ •’\p{L}\p{N}\p{P}]`)
 	for _, stringIndices := range valid.FindAllStringIndex(fname, -1) {
 		from := stringIndices[0]
 		ntil := stringIndices[1]
