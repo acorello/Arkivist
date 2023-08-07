@@ -49,6 +49,7 @@ var (
 	quietFlag           = flag.Bool("quiet", false, "do not print progress to stdout")
 	doRunFlag           = flag.Bool("run", false, "execute the operation")
 	doTrashFlag         = flag.Bool("trash", false, "trash successfully moved files")
+	doDeleteFlag        = flag.Bool("delete", false, "delete successfully moved files")
 	sourceDirectoryFlag = flag.String("source", "", "directory containing files to clean-up")
 	summaryFlag         = flag.Bool("summary", false, "print list of final filenames at the end")
 )
@@ -63,7 +64,7 @@ type Config struct {
 	onlyPrintFailed        bool
 	quiet                  bool
 	doRun                  bool
-	doTrash                bool
+	deleteMethod           string
 	sourceDirectory        string
 	summary                bool
 }
@@ -76,7 +77,7 @@ func (I Config) Errors() (errors []error) {
 	if I.doRun && I.onlyPrintFailed {
 		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
 	}
-	if I.doTrash && !I.doRun {
+	if I.deleteMethod != "" && !I.doRun {
 		errors = append(errors, fmt.Errorf("'trash' makes sense only with 'run'"))
 	}
 	errors = append(errors, missingDirectoriesErrors(I.destinationDirectories...)...)
@@ -85,33 +86,16 @@ func (I Config) Errors() (errors []error) {
 }
 
 func main() {
-	config, err := populateConfig()
-	if err != nil {
-		log.Fatal("Error parsing config", err)
+	config, errors := populateConfig()
+	if len(errors) > 0 {
+		fmt.Fprintf(os.Stderr, "Error parsing config:\n%v", errors)
+		os.Exit(1)
 	}
-
-	exitCode, stop := shouldStop(config)
-	if stop {
-		os.Exit(exitCode)
-	}
-
-	linkToCleanPath(config)
-}
-
-func shouldStop(config Config) (exitCode int, stop bool) {
 	if *justPrintConfigFlag {
 		fmt.Printf("%+v\n", config)
-		stop = true
+		os.Exit(0)
 	}
-	errors := config.Errors()
-	for _, err := range errors {
-		fmt.Println(err)
-	}
-	if len(errors) > 0 {
-		exitCode = 1
-		stop = true
-	}
-	return
+	linkToCleanPath(config)
 }
 
 func missingDirectoriesErrors(directories ...string) (errors []error) {
@@ -145,31 +129,45 @@ func directoryExists(path string) bool {
 	return true
 }
 
-func populateConfig() (config Config, err error) {
+func populateConfig() (config Config, errs []error) {
 	flag.Parse()
 	config = Config{
 		destinationDirectories: *destinationsDirectoryFlag,
 		onlyPrintFailed:        *onlyFailedFlag,
 		quiet:                  *quietFlag,
 		doRun:                  *doRunFlag,
-		doTrash:                *doTrashFlag,
 		sourceDirectory:        *sourceDirectoryFlag,
 		summary:                *summaryFlag,
+	}
+
+	if *doDeleteFlag && *doTrashFlag {
+		errs = append(errs, fmt.Errorf("either delete or trash flags should be given"))
+	} else {
+		if *doTrashFlag {
+			config.deleteMethod = "trash"
+		}
+		if *doDeleteFlag {
+			config.deleteMethod = "delete"
+		}
 	}
 	if len(config.destinationDirectories) == 0 {
 		config.destinationDirectories = []string{config.sourceDirectory}
 	}
-	config.sourceDirectory, err = filepath.Abs(config.sourceDirectory)
-	if err != nil {
-		return config, errors.Join(errors.New("filepath.Abs(<source-directory>) failed"), err)
+
+	if sourceDirectory, err := filepath.Abs(config.sourceDirectory); err != nil {
+		errs = append(errs, errors.Join(errors.New("filepath.Abs(<source-directory>) failed"), err))
+	} else {
+		config.sourceDirectory = sourceDirectory
 	}
+
 	for i, dir := range config.destinationDirectories {
-		config.destinationDirectories[i], err = filepath.Abs(dir)
-		if err != nil {
-			return config, errors.Join(errors.New("filepath.Abs(<destination-directory>) failed"), err)
+		if destinationDirectory, err := filepath.Abs(dir); err != nil {
+			errs = append(errs, errors.Join(errors.New("filepath.Abs(<destination-directory>) failed"), err))
+		} else {
+			config.destinationDirectories[i] = destinationDirectory
 		}
 	}
-	return config, nil
+	return config, errs
 }
 
 type Summary struct {
@@ -301,24 +299,49 @@ func linkToCleanPath(config Config) {
 			}
 		}
 	}
-	if config.doTrash {
+	switch config.deleteMethod {
+	case "trash":
 		tryTrash(successfullyLinkedFiles, &report)
+	case "delete":
+		tryDelete(successfullyLinkedFiles, &report)
+	default:
+		log.Fatal("delete method not supported!", config.deleteMethod)
 	}
 	report.Print()
+}
+
+func tryDelete(movedFiles fileset.FileSet, report *Summary) {
+	if movedFiles.IsEmpty() {
+		return
+	}
+	for fileName := range movedFiles {
+		report.Trashing(fileName)
+		if err := os.Remove(fileName); err != nil {
+			report.fmtSummary(color.RedString("ERROR DELETING FILE:\n%s"), fileName)
+		} else {
+			report.fmtSummary(color.GreenString("DELETED OK:\n%s"), fileName)
+		}
+	}
 }
 
 func tryTrash(movedFiles fileset.FileSet, report *Summary) {
 	if movedFiles.IsEmpty() {
 		return
 	}
+
 	var fileNames strings.Builder
-	for fileName := range movedFiles {
-		report.Trashing(fileName)
+	var appendForOSAScript = func(fileName string) {
 		if fileNames.Len() > 0 {
 			fileNames.WriteString(", ")
 		}
 		fileNames.WriteString(fmt.Sprintf(`POSIX file "%s"`, fileName))
 	}
+
+	for fileName := range movedFiles {
+		report.Trashing(fileName)
+		appendForOSAScript(fileName)
+	}
+
 	osascript := fmt.Sprintf(`tell application "Finder" to delete {%s}`, fileNames.String())
 	cmd := exec.Command("osascript", "-e", osascript)
 	out, err := cmd.CombinedOutput()
