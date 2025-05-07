@@ -78,7 +78,7 @@ func (I Config) Errors() (errors []error) {
 		errors = append(errors, fmt.Errorf("either 'rename' or 'onlyFailed' should be requested"))
 	}
 	if I.deleteMethod != "" && !I.doRun {
-		errors = append(errors, fmt.Errorf("'trash' makes sense only with 'run'"))
+		errors = append(errors, fmt.Errorf("'trash' or 'delete' flags make sense only with 'run'"))
 	}
 	errors = append(errors, missingDirectoriesErrors(I.destinationDirectories...)...)
 	errors = append(errors, missingDirectoriesErrors(I.sourceDirectory)...)
