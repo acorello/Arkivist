@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"strings"
 
-	"dev.acorello.it/go/arkivist/clapp/zl_cleanup/fileset"
+	"dev.acorello.it/go/arkivist/cmd/zl_cleanup/fileset"
 	"github.com/fatih/color"
 )
 
