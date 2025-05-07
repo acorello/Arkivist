@@ -1,6 +1,7 @@
 package notion_test
 
 import (
+	"os"
 	"testing"
 
 	"dev.acorello.it/go/arkivist/notion"
@@ -8,7 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var api notion.Notion = notion.LoadTOMLConfig("../_tmp/arkivist.secrets.toml")
+var api notion.Notion
+
+func TestEnv(t *testing.T) {
+	// guess I was just checking how to get the env? was I running any useful stuff from tests?
+	const ENVK = "NOTION_AUTH_TOKEN"
+	val, found := os.LookupEnv(ENVK)
+	if !found {
+		t.Error(ENVK, "not found")
+	} else {
+		println(ENVK, "=", val)
+	}
+}
 
 func Test_GetDatabase(t *testing.T) {
 	t.Skip("SKIP REASON: Exploratory test that calls a third-party service")
